@@ -17,15 +17,27 @@ export default function ReportDetailPage() {
   useEffect(() => {
     if (!id) return;
     const fetchReport = async () => {
-      const { data, error } = await supabase
+      const { data: reportData, error: reportError } = await supabase
         .from('citizen_reports')
-        .select(`*, profiles:user_id(full_name)`) // Join to get citizen name
+        .select(`*`)
         .eq('id', id)
         .single();
-      
-      if (!error && data) {
-        setReport(data);
+
+      if (!reportError && reportData) {
+        if (reportData.user_id) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .or(`id.eq.${reportData.user_id},id.eq.${reportData.user_id}`)
+            .single();
+
+          if (profileData) {
+            reportData.profiles = profileData;
+          }
+        }
+        setReport(reportData);
       }
+      if (reportError) console.error(reportError);
       setLoading(false);
     };
     fetchReport();
@@ -57,7 +69,7 @@ export default function ReportDetailPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans">
       <div className="max-w-5xl mx-auto animate-in fade-in duration-300">
-        
+
         {/* Header */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -67,11 +79,10 @@ export default function ReportDetailPage() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-slate-900">Report Detail</h1>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${
-                    report.status === 'Verified' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                    report.status === 'Resolved' ? 'bg-green-100 text-green-700 border-green-200' :
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${report.status === 'Verified' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                  report.status === 'Resolved' ? 'bg-green-100 text-green-700 border-green-200' :
                     report.status === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' :
-                    'bg-amber-100 text-amber-700 border-amber-200'
+                      'bg-amber-100 text-amber-700 border-amber-200'
                   }`}>
                   {report.status}
                 </span>
@@ -115,7 +126,7 @@ export default function ReportDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Details & AI */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* AI Analysis Card */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 relative overflow-hidden">
               <div className={`absolute top-0 left-0 w-1 h-full ${report.ai_risk_level === 'High' ? 'bg-red-500' : report.ai_risk_level === 'Medium' ? 'bg-orange-500' : 'bg-green-500'}`}></div>
@@ -174,7 +185,7 @@ export default function ReportDetailPage() {
 
           {/* Right Column: Meta Info */}
           <div className="space-y-6">
-            
+
             {/* Project Context */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
               <h3 className="font-bold text-slate-800 mb-4 text-sm uppercase tracking-wide border-b border-slate-100 pb-2">
@@ -195,7 +206,7 @@ export default function ReportDetailPage() {
                       <div className="text-sm text-slate-700 font-medium font-mono">
                         {report.latitude.toFixed(6)}, {report.longitude.toFixed(6)}
                       </div>
-                      <a 
+                      <a
                         href={`https://www.google.com/maps/search/?api=1&query=${report.latitude},${report.longitude}`}
                         target="_blank" rel="noreferrer"
                         className="text-xs text-blue-600 hover:underline mt-1 block"

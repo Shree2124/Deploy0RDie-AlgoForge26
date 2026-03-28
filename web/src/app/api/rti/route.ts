@@ -4,21 +4,22 @@ import { supabaseAdmin } from '@/lib/dbConnect';
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    
+
     // 1. Safely extract fields (Supports both your Frontend UI and new schema)
     const department = formData.get('department') as string;
-    const subject = formData.get('subject') as string || formData.get('title') as string;
-    const query = formData.get('query') as string || formData.get('description') as string || formData.get('questions') as string;
-    
+    const title = formData.get('subject') as string;
+    const description = formData.get('query') as string;
+
     const is_anonymous = formData.get('is_anonymous') === 'true';
     const location_address = formData.get('location_address') as string;
     const locationString = formData.get('location') as string | null;
     const userId = formData.get('userId') as string | null;
     const file = formData.get('file') as File | null;
     const linkedReportId = formData.get('linkedReportId') as string | null;
+    const questionsString = formData.get('questions') as string | null;
 
     // Basic validation
-    if (!department || !subject || !query) {
+    if (!department || !title || !description) {
       return NextResponse.json({ error: 'Department, subject, and query are required' }, { status: 400 });
     }
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     if (file) {
       const filePath = `rti-documents/${userId || 'public'}/${Date.now()}-${file.name.replace(/\s/g, '-')}`;
       const { error: uploadError } = await supabaseAdmin.storage
-        .from('rti-files') 
+        .from('rti-files')
         .upload(filePath, file);
 
       if (uploadError) {
@@ -41,18 +42,28 @@ export async function POST(request: NextRequest) {
     // 3. Prepare data for insertion (Dynamically building to avoid DB column errors)
     const insertData: any = {
       department,
-      subject,
-      query,
+      title,
+      description,
       status: 'Pending Review', // Standardized status matching Admin Dashboard
-      linked_report_id: linkedReportId || null,
-      document_url: documentUrl,
+      project_id: "PRJ-001"
     };
+
+    if (linkedReportId) insertData.linked_report_id = linkedReportId;
+    if (documentUrl) insertData.extract_data = { document_url: documentUrl };
 
     // Only add optional new-schema fields if they exist in the payload
     if (!is_anonymous && userId) insertData.user_id = userId;
     if (is_anonymous) insertData.is_anonymous = true;
     if (location_address) insertData.location_address = location_address;
-    
+
+    if (questionsString) {
+      try {
+        insertData.questions = JSON.parse(questionsString);
+      } catch (e) {
+        console.error('Failed to parse questions JSON');
+      }
+    }
+
     if (locationString) {
       try {
         insertData.location = JSON.parse(locationString);

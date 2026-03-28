@@ -763,14 +763,14 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                           {doc.status}
                         </span>
                       </div>
-                      <h3 className="text-lg font-bold mb-1 truncate" style={{ color: '#040f0f' }}>{doc.subject}</h3>
+                      <h3 className="text-lg font-bold mb-1 truncate" style={{ color: '#040f0f' }}>{doc.title}</h3>
                       <p className="text-xs font-mono mb-4" style={{ color: '#57737a' }}>{doc.department}</p>
                       <p className="text-xs font-mono mb-4" style={{ color: '#85bdbf' }}>
-                        ID: {doc.id.slice(0, 8)}... • {new Date(doc.created_at).toLocaleDateString()}
+                        ID: {doc.id} • {new Date(doc.created_at).toLocaleDateString()}
                       </p>
-                      {doc.document_url && (
+                      {doc.extract_data?.document_url && (
                         <a
-                          href={doc.document_url}
+                          href={doc.extract_data.document_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="w-full py-2 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
