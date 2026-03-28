@@ -8,12 +8,15 @@ import {
   LayoutDashboard, ClipboardList, FileText, MapPin, AlertTriangle, ArrowRight,
   LocateFixed, Download, CheckCircle2, Building2, Menu, X, Camera,
   LogOut, TrendingUp, ShieldCheck, Activity, BarChart3, Clock, ChevronRight,
-  Zap, Eye, EyeOff, Lock, FileBarChart
+  Eye, EyeOff, Lock, FileBarChart
 } from "lucide-react";
 import { OfficialRecord, ProjectCategory } from "@/types/types";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase/client";
+
+// Import Modular Tabs
 import ReportIssueTab from "@/components/dashboard/ReportIssueTab";
+import NewRtiTab from "@/components/dashboard/NewRtiTab"; // NEW COMPONENT IMPORTED
 
 // --- DYNAMIC MAP IMPORT ---
 const MapVisualizer = dynamic(
@@ -49,13 +52,15 @@ interface DashboardPageProps {
   setIsMobileNavOpen?: (open: boolean) => void;
 }
 
+type TabType = "overview" | "reports" | "rti" | "reportissue" | "new-rti";
+
 export default function DashboardPage({ activeTab: propActiveTab, onTabChange, isMobileNavOpen, setIsMobileNavOpen }: DashboardPageProps) {
   const router = useRouter();
   const { user, signOut, refreshUser } = useAuth();
-  const [internalTab, setInternalTab] = useState<"overview" | "reports" | "rti" | "reportissue">("overview");
-  const activeTab = (propActiveTab || internalTab) as "overview" | "reports" | "rti" | "reportissue";
+  const [internalTab, setInternalTab] = useState<TabType>("overview");
+  const activeTab = (propActiveTab || internalTab) as TabType;
 
-  const setActiveTab = (tab: "overview" | "reports" | "rti" | "reportissue") => {
+  const setActiveTab = (tab: TabType) => {
     if (onTabChange) onTabChange(tab);
     else setInternalTab(tab);
   };
@@ -101,6 +106,20 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
   }, []);
 
   // Fetch Real Reports from Supabase DB
+  const fetchRtiRequests = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('rti_requests')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setMyRtiRequests(data);
+    }
+    setLoadingRti(false);
+  };
+
   useEffect(() => {
     if (!user) {
       setLoadingReports(false);
@@ -118,19 +137,6 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
         setMyReports(data);
       }
       setLoadingReports(false);
-    };
-
-    const fetchRtiRequests = async () => {
-      const { data, error } = await supabase
-        .from('rti_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setMyRtiRequests(data);
-      }
-      setLoadingRti(false);
     };
 
     fetchReports();
@@ -226,13 +232,13 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
 
   return (
     <div className="flex flex-col h-full overflow-hidden w-full font-sans relative">
-      
+
       {/* SECURE VERIFICATION MODAL */}
       {showVerifyModal && (
         <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="bg-[#040f0f] p-6 text-white relative">
-              <button onClick={() => setShowVerifyModal(false)} className="absolute top-4 right-4 text-[#85bdbf] hover:text-white"><X size={20}/></button>
+              <button onClick={() => setShowVerifyModal(false)} className="absolute top-4 right-4 text-[#85bdbf] hover:text-white"><X size={20} /></button>
               <ShieldCheck size={32} className="text-[#85bdbf] mb-3" />
               <h2 className="text-xl font-bold">Identity Verification Required</h2>
               <p className="text-sm mt-1" style={{ color: '#85bdbf' }}>Government guidelines mandate KYC to file official reports.</p>
@@ -240,7 +246,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
             <form onSubmit={handleVerificationSubmit} className="p-6 space-y-5">
               {user?.verification_status === 'Rejected' && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium flex items-start gap-2">
-                  <AlertTriangle size={16} className="shrink-0 mt-0.5"/>
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
                   <div><strong className="block">Previous Request Rejected:</strong> {user.rejection_reason}</div>
                 </div>
               )}
@@ -249,14 +255,14 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                 <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" className="w-full p-3 rounded-xl focus:outline-none transition-all" style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }} />
               </div>
               <div>
-                <label className="block text-sm font-bold mb-2 flex items-center gap-1" style={{ color: '#040f0f' }}><Lock size={14}/> Aadhar Number</label>
+                <label className="block text-sm font-bold mb-2 flex items-center gap-1" style={{ color: '#040f0f' }}><Lock size={14} /> Aadhar Number</label>
                 <div className="relative group">
-                  <input required type={showAadhar ? "text" : "password"} value={aadhar} onChange={(e) => setAadhar(e.target.value.replace(/\D/g, '').slice(0,12))} placeholder="XXXX XXXX XXXX" className="w-full p-3 pr-12 rounded-xl focus:outline-none font-mono tracking-widest transition-all" style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }} />
+                  <input required type={showAadhar ? "text" : "password"} value={aadhar} onChange={(e) => setAadhar(e.target.value.replace(/\D/g, '').slice(0, 12))} placeholder="XXXX XXXX XXXX" className="w-full p-3 pr-12 rounded-xl focus:outline-none font-mono tracking-widest transition-all" style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }} />
                   <button type="button" onMouseLeave={() => setShowAadhar(false)} onClick={() => setShowAadhar(!showAadhar)} className="absolute right-3 top-3.5 transition-colors" style={{ color: '#57737a' }}>
                     {showAadhar ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-                <p className="text-xs mt-2 flex items-center gap-1" style={{ color: '#57737a' }}><ShieldCheck size={12}/> 256-bit Encrypted. Used strictly for deduplication.</p>
+                <p className="text-xs mt-2 flex items-center gap-1" style={{ color: '#57737a' }}><ShieldCheck size={12} /> 256-bit Encrypted. Used strictly for deduplication.</p>
               </div>
               <button disabled={submittingVerify} type="submit" className="w-full py-3.5 font-bold rounded-xl disabled:opacity-50 transition-colors text-white" style={{ backgroundColor: '#57737a' }}>
                 {submittingVerify ? "Securing Data..." : "Submit for Verification"}
@@ -289,8 +295,8 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                 onClick={() => { setActiveTab(item.id as any); setIsMobileNavOpen?.(false); }}
                 className="w-full flex items-center gap-3 px-4 py-4 rounded-xl text-[14px] font-medium transition-all"
                 style={{
-                  backgroundColor: activeTab === item.id ? "rgba(255,255,255,0.18)" : "transparent",
-                  color: activeTab === item.id ? "#ffffff" : "rgba(255,255,255,0.75)",
+                  backgroundColor: activeTab === item.id || (activeTab === 'new-rti' && item.id === 'rti') ? "rgba(255,255,255,0.18)" : "transparent",
+                  color: activeTab === item.id || (activeTab === 'new-rti' && item.id === 'rti') ? "#ffffff" : "rgba(255,255,255,0.75)",
                 }}
               >
                 <item.icon size={20} /> {item.label}
@@ -318,16 +324,16 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto scroll-smooth relative z-0" style={{ backgroundColor: "#f4feff" }}>
-        
+
         {/* Verification Status Banner */}
         {user?.verification_status === 'Pending' && (
           <div className="w-full px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium z-50" style={{ backgroundColor: '#fef3c7', color: '#92400e', borderBottom: '1px solid #fde68a' }}>
-            <Clock size={16}/> KYC Verification Pending. Core features are restricted until Admin approval.
+            <Clock size={16} /> KYC Verification Pending. Core features are restricted until Admin approval.
           </div>
         )}
         {user?.verification_status === 'Rejected' && (
           <div className="w-full px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium z-50" style={{ backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '1px solid #fecaca' }}>
-            <AlertTriangle size={16}/> KYC Rejected. Click any feature to re-submit details.
+            <AlertTriangle size={16} /> KYC Rejected. Click any feature to re-submit details.
           </div>
         )}
 
@@ -596,7 +602,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                     </div>
                   </div>
 
-                  <div onClick={() => handleProtectedAction("/rti")}>
+                  <div onClick={() => handleProtectedAction("new-rti")}>
                     <div
                       className="p-5 rounded-2xl transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
                       style={{
@@ -733,8 +739,8 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                   <p className="text-sm mt-1" style={{ color: '#57737a' }}>Manage your Right to Information requests</p>
                 </div>
                 <button
-                  onClick={() => handleProtectedAction("/rti")}
-                  className="px-4 py-2 rounded-xl text-[14px] font-bold flex items-center gap-2 text-white transition-all"
+                  onClick={() => handleProtectedAction("new-rti")}
+                  className="px-4 py-2 rounded-xl text-[14px] font-bold flex items-center gap-2 text-white transition-all hover:opacity-90"
                   style={{ backgroundColor: '#57737a' }}
                 >
                   <FileText size={16} /> File New RTI
@@ -773,7 +779,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                           href={doc.extract_data.document_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full py-2 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                          className="w-full py-2 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 hover:bg-[#f4feff]"
                           style={{
                             border: '1px solid #b0d8db',
                             color: '#57737a',
@@ -786,6 +792,18 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                   ))
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {/* --- NEW RTI FORM TAB --- */}
+          {activeTab === "new-rti" && (
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="py-2">
+              <NewRtiTab
+                onBack={() => {
+                  setActiveTab("rti");
+                  fetchRtiRequests(); // Refresh the list when coming back
+                }}
+              />
             </motion.div>
           )}
 
