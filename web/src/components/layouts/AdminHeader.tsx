@@ -49,6 +49,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     switch (activeTab) {
       case "overview": return "Overview";
       case "issues": return "Issues & Risk";
+      case "verifications": return "Citizen KYC";
       case "rti": return "RTI Requests";
       case "contractors": return "Contractors";
       case "system": return "System Admin";

@@ -39,7 +39,7 @@ const MOCK_RTI_REQUESTS = [
 ];
 
 export default function AdminDashboardPage({ activeTab = "overview" }: { activeTab?: string }) {
-  const [tab, setTab] = useState(activeTab);
+  const tab = activeTab;
 
   // --- DYNAMIC DATA STATE ---
   const [reports, setReports] = useState<any[]>([]);
@@ -120,19 +120,6 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
   return (
     <div className="h-full overflow-y-auto p-4 lg:p-8 scroll-smooth" style={{ backgroundColor: "#f4feff" }}>
       <div className="max-w-7xl mx-auto text-slate-900 font-sans">
-
-        {/* TOP TAB NAV (With new Verifications Tab) */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button onClick={() => setTab("overview")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'overview' ? 'bg-[#57737a] text-white shadow-lg' : 'bg-white text-[#57737a] border border-[#b0d8db]'}`}>Overview</button>
-          <button onClick={() => setTab("issues")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'issues' ? 'bg-[#57737a] text-white shadow-lg' : 'bg-white text-[#57737a] border border-[#b0d8db]'}`}>Issues & Risk</button>
-          <button onClick={() => setTab("verifications")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${tab === 'verifications' ? 'bg-[#57737a] text-white shadow-lg' : 'bg-white text-[#57737a] border border-[#b0d8db]'}`}>
-            <ShieldCheck size={16} /> Citizen KYC
-            {pendingVerifications.length > 0 && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{pendingVerifications.length}</span>}
-          </button>
-          <button onClick={() => setTab("rti")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'rti' ? 'bg-[#57737a] text-white shadow-lg' : 'bg-white text-[#57737a] border border-[#b0d8db]'}`}>RTI</button>
-          <button onClick={() => setTab("contractors")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'contractors' ? 'bg-[#57737a] text-white shadow-lg' : 'bg-white text-[#57737a] border border-[#b0d8db]'}`}>Contractors</button>
-          <button onClick={() => setTab("system")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'system' ? 'bg-[#57737a] text-white shadow-lg' : 'bg-white text-[#57737a] border border-[#b0d8db]'}`}>System</button>
-        </div>
 
         {/* VIEW: OVERVIEW */}
         {tab === "overview" && (

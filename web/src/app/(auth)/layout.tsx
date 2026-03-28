@@ -26,10 +26,10 @@ export default function AuthLayout({
     return <LoadingScreen />;
   }
 
-  // If user is authenticated and verified, don't render auth pages
-  // (router.replace above will handle redirect)
+  // If user is authenticated and verified, show loading screen while router transitions
+  // (router.replace above handle the redirect to dashboard)
   if (user && emailVerified) {
-    return null;
+    return <LoadingScreen />;
   }
 
   return <>{children}</>;

@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
 
         // Ye line aapke .env file se password uthayegi
         const adminEmail = process.env.ADMIN_EMAIL;
-        const adminPassword = process.env.ADMIN_PASSWORD;
+        const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
         if (!adminEmail || !adminPassword) {
             return NextResponse.json(
@@ -17,12 +17,12 @@ export async function POST(req: NextRequest) {
 
         if (email === adminEmail && password === adminPassword) {
             const adminUser = {
-                id: 'admin-super-user', 
+                id: 'admin-super-user',
                 email: adminEmail,
                 name: 'Super Administrator',
                 role: 'admin',
                 emailVerified: true,
-                isAdmin: true 
+                isAdmin: true
             };
             return NextResponse.json(adminUser, { status: 200 });
         }
