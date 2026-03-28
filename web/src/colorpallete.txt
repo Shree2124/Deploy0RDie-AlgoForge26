@@ -1,0 +1,29 @@
+- CSV
+
+c9fbff,c2fcf7,85bdbf,57737a,040f0f
+
+- With #
+
+#c9fbff, #c2fcf7, #85bdbf, #57737a, #040f0f
+
+- Array
+
+["c9fbff","c2fcf7","85bdbf","57737a","040f0f"]
+
+- Object
+
+{"Frozen Water":"c9fbff","Icy Aqua":"c2fcf7","Pearl Aqua":"85bdbf","Blue Slate":"57737a","Ink Black":"040f0f"}
+
+- Extended Array
+
+[{"name":"Frozen Water","hex":"c9fbff","rgb":[201,251,255],"cmyk":[21,2,0,0],"hsb":[184,21,100],"hsl":[184,100,89],"lab":[95,-15,-7]},{"name":"Icy Aqua","hex":"c2fcf7","rgb":[194,252,247],"cmyk":[23,0,2,1],"hsb":[175,23,99],"hsl":[175,91,87],"lab":[95,-19,-4]},{"name":"Pearl Aqua","hex":"85bdbf","rgb":[133,189,191],"cmyk":[30,1,0,25],"hsb":[182,30,75],"hsl":[182,31,64],"lab":[73,-18,-7]},{"name":"Blue Slate","hex":"57737a","rgb":[87,115,122],"cmyk":[29,6,0,52],"hsb":[192,29,48],"hsl":[192,17,41],"lab":[47,-8,-7]},{"name":"Ink Black","hex":"040f0f","rgb":[4,15,15],"cmyk":[73,0,0,94],"hsb":[180,73,6],"hsl":[180,58,4],"lab":[4,-3,-1]}]
+
+- XML
+
+<palette>
+  <color name="Frozen Water" hex="c9fbff" r="201" g="251" b="255" />
+  <color name="Icy Aqua" hex="c2fcf7" r="194" g="252" b="247" />
+  <color name="Pearl Aqua" hex="85bdbf" r="133" g="189" b="191" />
+  <color name="Blue Slate" hex="57737a" r="87" g="115" b="122" />
+  <color name="Ink Black" hex="040f0f" r="4" g="15" b="15" />
+</palette>
