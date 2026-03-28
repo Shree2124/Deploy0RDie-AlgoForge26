@@ -1,0 +1,63 @@
+# Environments
+.env
+venv/
+env/
+.venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# YOLOv8 / PyTorch / Deep Learning
+runs/
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Data & Temp Directories
+temp/
+data/images/
+data/labels/
+data_split/train/
+data_split/valid/
+data_split/test/
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.avi
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swm
+*.swo
+.DS_Store
+
+# Logs
+*.log
