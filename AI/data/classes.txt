@@ -1,0 +1,4 @@
+construction_debris
+cracks
+damaged
+potholes

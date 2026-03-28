@@ -1,0 +1,9 @@
+path: D:/AlgoForge/ai/data_split
+train: train/images
+val: valid/images
+nc: 4
+names:
+- construction_debris
+- cracks
+- damaged
+- potholes
