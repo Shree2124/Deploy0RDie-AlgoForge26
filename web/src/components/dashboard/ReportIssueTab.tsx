@@ -21,6 +21,9 @@ export default function ReportIssueTab({ onBackToDashboard }: ReportIssueTabProp
     longitude: 0,
     address: "",
     file: null as File | null,
+    category: "General",
+    otherCategory: "",
+    isAnonymous: false,
   });
 
   const [error, setError] = useState("");
@@ -76,7 +79,9 @@ export default function ReportIssueTab({ onBackToDashboard }: ReportIssueTabProp
       formData.append("longitude", data.longitude.toString());
       formData.append("description", data.description);
       formData.append("address", data.address);
-      if (user) formData.append("userId", user.id);
+      formData.append("category", data.category === "Other" && data.otherCategory ? data.otherCategory : data.category);
+      formData.append("is_anonymous", data.isAnonymous.toString());
+      if (user && !data.isAnonymous) formData.append("userId", user.id);
 
       const res = await fetch("/api/report", {
         method: "POST",
@@ -126,6 +131,51 @@ export default function ReportIssueTab({ onBackToDashboard }: ReportIssueTabProp
                   value={data.description}
                   onChange={(e) => setData({ ...data, description: e.target.value })}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-2" style={{ color: "#040f0f" }}>Category</label>
+                <select
+                  value={data.category}
+                  onChange={(e) => setData({ ...data, category: e.target.value })}
+                  className="w-full p-3 rounded-xl outline-none font-medium transition-colors focus:ring-2 focus:ring-[#85bdbf] focus:border-[#85bdbf]"
+                  style={{ backgroundColor: "#f4feff", border: "1px solid #b0d8db", color: "#040f0f" }}
+                >
+                  <option value="Building & Construction">Building & Construction</option>
+                  <option value="Road & potholes">Road & potholes</option>
+                  <option value="Water & Sewage">Water & Sewage</option>
+                  <option value="Electricity & Streetlights">Electricity & Streetlights</option>
+                  <option value="General">General</option>
+                  <option value="Other">Other</option>
+                </select>
+                {data.category === "Other" && (
+                  <input
+                    type="text"
+                    placeholder="Specify other category"
+                    className="w-full mt-3 p-3 rounded-xl outline-none font-medium transition-colors focus:ring-2 focus:ring-[#85bdbf] focus:border-[#85bdbf]"
+                    style={{ backgroundColor: "#f4feff", border: "1px solid #b0d8db", color: "#040f0f" }}
+                    value={data.otherCategory}
+                    onChange={(e) => setData({ ...data, otherCategory: e.target.value })}
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: "#fefce8", border: "1px solid #fef08a" }}>
+                <input
+                  type="checkbox"
+                  id="anonymous-report"
+                  checked={data.isAnonymous}
+                  onChange={(e) => setData({ ...data, isAnonymous: e.target.checked })}
+                  className="w-5 h-5 rounded border-gray-300 text-[#57737a] focus:ring-[#85bdbf] cursor-pointer"
+                />
+                <div>
+                  <label htmlFor="anonymous-report" className="font-bold cursor-pointer" style={{ color: "#854d0e" }}>
+                    Report Anonymously
+                  </label>
+                  <p className="text-xs mt-0.5" style={{ color: "#a16207" }}>
+                    Your identity will not be linked to this audit or publicly visible.
+                  </p>
+                </div>
               </div>
 
               <div className="p-5 rounded-xl space-y-4" style={{ backgroundColor: "#e0f7f9", border: "1px solid #b0d8db" }}>

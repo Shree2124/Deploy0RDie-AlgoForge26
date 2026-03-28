@@ -230,7 +230,11 @@ export default function ReportDetailPage() {
                 </div>
                 <div>
                   <div className="font-medium text-slate-900">{report.profiles?.full_name || 'Anonymous Citizen'}</div>
-                  <div className="text-xs text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded inline-block mt-0.5">Verified Account</div>
+                  {report.user_id ? (
+                    <div className="text-xs text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded inline-block mt-0.5">Verified Account</div>
+                  ) : (
+                    <div className="text-xs text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">Identity Protected</div>
+                  )}
                 </div>
               </div>
 

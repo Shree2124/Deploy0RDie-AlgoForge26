@@ -380,7 +380,7 @@ export default function NewRtiTab({ onBack }: NewRtiTabProps) {
                                         className="text-xs transition-all shadow-sm font-bold px-3 py-1.5 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
                                         style={{ backgroundColor: '#040f0f', color: '#c2fcf7' }}
                                     >
-                                        {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <span>✨ Auto-Draft with AI</span>}
+                                        {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <span> Auto-Draft with AI</span>}
                                     </button>
                                 </div>
                                 <textarea
@@ -390,6 +390,24 @@ export default function NewRtiTab({ onBack }: NewRtiTabProps) {
                                     className="w-full p-3 rounded-xl focus:outline-none transition-all resize-none"
                                     style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }}
                                 />
+                            </div>
+
+                            <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: "#fefce8", border: "1px solid #fef08a" }}>
+                                <input
+                                    type="checkbox"
+                                    id="anonymous-rti"
+                                    checked={isAnonymous}
+                                    onChange={(e) => setIsAnonymous(e.target.checked)}
+                                    className="w-5 h-5 rounded border-gray-300 text-[#57737a] focus:ring-[#85bdbf] cursor-pointer"
+                                />
+                                <div>
+                                    <label htmlFor="anonymous-rti" className="font-bold cursor-pointer" style={{ color: "#854d0e" }}>
+                                        File Anonymously
+                                    </label>
+                                    <p className="text-xs mt-0.5" style={{ color: "#a16207" }}>
+                                        Your identity will be protected and not revealed to the department.
+                                    </p>
+                                </div>
                             </div>
 
                             <div>
