@@ -23,6 +23,8 @@ export default function NewRtiTab({ onBack }: NewRtiTabProps) {
     const [userIssues, setUserIssues] = useState<any[]>([]);
     const [loadingIssues, setLoadingIssues] = useState(true);
 
+    const [aiLoading, setAiLoading] = useState(false);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [isAnonymous, setIsAnonymous] = useState(false);
@@ -165,6 +167,40 @@ export default function NewRtiTab({ onBack }: NewRtiTabProps) {
         } catch (err: any) {
             setError(err.message || "An error occurred.");
             setLoading(false);
+        }
+    };
+
+    const handleAiDraft = async () => {
+        if (!formData.department || !formData.subject) {
+            setError("Please provide a Target Department and Subject to intelligently draft the query.");
+            return;
+        }
+
+        setAiLoading(true);
+        setError("");
+
+        try {
+            const response = await fetch('/api/rti/ai-suggest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    department: formData.department,
+                    subject: formData.subject,
+                    questions: questions.filter(q => q.trim() !== ''),
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "AI service failed. Please check your network or try again.");
+            }
+
+            setFormData(prev => ({ ...prev, query: data.suggestion }));
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setAiLoading(false);
         }
     };
 
@@ -334,8 +370,19 @@ export default function NewRtiTab({ onBack }: NewRtiTabProps) {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-bold mb-2" style={{ color: '#040f0f' }}>Detailed Query / Information Required</label>
+                            <div className="relative">
+                                <div className="flex flex-col sm:flex-row justify-between sm:items-end mb-2 gap-2">
+                                    <label className="block text-sm font-bold" style={{ color: '#040f0f' }}>Detailed Query / Information Required</label>
+                                    <button
+                                        type="button"
+                                        onClick={handleAiDraft}
+                                        disabled={aiLoading || !formData.subject}
+                                        className="text-xs transition-all shadow-sm font-bold px-3 py-1.5 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
+                                        style={{ backgroundColor: '#040f0f', color: '#c2fcf7' }}
+                                    >
+                                        {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <span>✨ Auto-Draft with AI</span>}
+                                    </button>
+                                </div>
                                 <textarea
                                     required name="query" rows={6}
                                     value={formData.query} onChange={handleChange}
