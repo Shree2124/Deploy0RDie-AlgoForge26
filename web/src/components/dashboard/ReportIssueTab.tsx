@@ -81,7 +81,7 @@ export default function ReportIssueTab({ onBackToDashboard }: ReportIssueTabProp
       formData.append("address", data.address);
       formData.append("category", data.category === "Other" && data.otherCategory ? data.otherCategory : data.category);
       formData.append("is_anonymous", data.isAnonymous.toString());
-      if (user && !data.isAnonymous) formData.append("userId", user.id);
+      if (user) formData.append("userId", user.id);
 
       const res = await fetch("/api/report", {
         method: "POST",

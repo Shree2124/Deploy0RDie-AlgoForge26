@@ -24,11 +24,12 @@ export default function ReportDetailPage() {
         .single();
 
       if (!reportError && reportData) {
-        if (reportData.user_id) {
+        // Only fetch profile if report is NOT anonymous
+        if (reportData.user_id && !reportData.is_anonymous) {
           const { data: profileData } = await supabase
             .from('profiles')
             .select('full_name')
-            .or(`id.eq.${reportData.user_id},id.eq.${reportData.user_id}`)
+            .eq('id', reportData.user_id)
             .single();
 
           if (profileData) {
@@ -229,11 +230,16 @@ export default function ReportDetailPage() {
                   <User size={20} />
                 </div>
                 <div>
-                  <div className="font-medium text-slate-900">{report.profiles?.full_name || 'Anonymous Citizen'}</div>
-                  {report.user_id ? (
-                    <div className="text-xs text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded inline-block mt-0.5">Verified Account</div>
+                  {report.is_anonymous ? (
+                    <>
+                      <div className="font-medium text-slate-900">Anonymous Citizen</div>
+                      <div className="text-xs text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">Identity Protected</div>
+                    </>
                   ) : (
-                    <div className="text-xs text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">Identity Protected</div>
+                    <>
+                      <div className="font-medium text-slate-900">{report.profiles?.full_name || 'Unknown Citizen'}</div>
+                      <div className="text-xs text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded inline-block mt-0.5">Verified Account</div>
+                    </>
                   )}
                 </div>
               </div>

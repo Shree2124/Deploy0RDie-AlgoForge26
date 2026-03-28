@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         longitude,
         notes: description,
         category: category || 'Other',
-        user_id: isAnonymous ? null : (userId || null),
+        user_id: userId,
         status: 'Verified', // Auto verified as requested
         is_anonymous: isAnonymous
       })
