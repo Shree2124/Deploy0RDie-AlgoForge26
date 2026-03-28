@@ -42,17 +42,19 @@ const LoginView = () => {
 
     try {
       await signIn(email, password);
-      // A bit of a hack to check for admin session after signIn completes
+
+      // FIX: Using window.location.href instead of router.push
+      // This forces a hard navigation, ensuring that the auth cookies 
+      // are properly sent to the Next.js middleware, preventing race conditions.
       const adminSession = localStorage.getItem("admin_session");
       if (adminSession) {
-        router.push("/admin/dashboard");
+        window.location.href = "/admin/dashboard";
       } else {
-        router.push(redirectTo);
+        window.location.href = redirectTo;
       }
     } catch (err) {
       // Error handled by context
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only stop loading if there's an error, otherwise let the page redirect
     }
   };
 
@@ -63,7 +65,7 @@ const LoginView = () => {
     try {
       // Pass the redirect URL so Supabase knows where to send them back
       await signInWithGoogle(`${window.location.origin}${redirectTo}`);
-      // No router.push needed here because Supabase redirects the browser page natively
+      // No routing needed here because Supabase redirects the browser page natively
     } catch (err) {
       // Error handled by context
       setIsLoading(false);
