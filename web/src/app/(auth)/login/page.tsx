@@ -43,14 +43,13 @@ const LoginView = () => {
     try {
       await signIn(email, password);
 
-      // FIX: Using window.location.href instead of router.push
-      // This forces a hard navigation, ensuring that the auth cookies 
-      // are properly sent to the Next.js middleware, preventing race conditions.
+      // Use router.push for soft navigation so that the application seamlessly
+      // transitions states without unmounting and showing blank screens.
       const adminSession = localStorage.getItem("admin_session");
       if (adminSession) {
-        window.location.href = "/admin/dashboard";
+        router.push("/admin/dashboard");
       } else {
-        window.location.href = redirectTo;
+        router.push(redirectTo);
       }
     } catch (err) {
       // Error handled by context

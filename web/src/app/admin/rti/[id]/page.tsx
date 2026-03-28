@@ -1,274 +1,216 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowLeft, FileText, Send, Paperclip, AlertCircle, CheckCircle2,
-  Building2, Link as LinkIcon, Loader2, X
-} from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase/client";
+import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2, Building2, HelpCircle, User } from "lucide-react";
 
-export default function FileRTIPage() {
+export default function AdminRtiReviewPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const params = useParams();
+  const id = params?.id as string;
+
+  const [rtiData, setRtiData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
-  
-  // State for user's verified reports to use as evidence
-  const [verifiedReports, setVerifiedReports] = useState<any[]>([]);
-  const [loadingReports, setLoadingReports] = useState(true);
+  const [success, setSuccess] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Rejection Modal State
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
-  const [formData, setFormData] = useState({
-    department: "Municipal Corporation",
-    subject: "",
-    query: "",
-    linkedReportId: "",
-    file: null as File | null,
-  });
-
-  // Fetch verified reports for evidence linking
   useEffect(() => {
-    if (!user) return;
-    const fetchVerifiedReports = async () => {
-      const { data, error } = await supabase
-        .from('citizen_reports')
-        .select('id, category, created_at, ai_risk_level')
-        .eq('user_id', user.id)
-        .eq('status', 'Verified')
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setVerifiedReports(data);
+    if (!id) return;
+    const fetchRti = async () => {
+      try {
+        const res = await fetch(`/api/get-rti/${id}`);
+        if (!res.ok) throw new Error("RTI Request not found");
+        const data = await res.json();
+        setRtiData(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-      setLoadingReports(false);
     };
-    fetchVerifiedReports();
-  }, [user]);
+    fetchRti();
+  }, [id]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, file: e.target.files[0] });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      setError("You must be logged in to file an RTI.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
+  const handleAction = async (status: 'Approved' | 'Rejected' | 'Pending', reason?: string) => {
+    setActionLoading(true);
     try {
-      const payload = new FormData();
-      payload.append("department", formData.department);
-      payload.append("subject", formData.subject);
-      payload.append("query", formData.query);
-      payload.append("userId", user.id);
-      
-      if (formData.linkedReportId) {
-        payload.append("linkedReportId", formData.linkedReportId);
-      }
-      if (formData.file) {
-        payload.append("file", formData.file);
-      }
-
-      const res = await fetch("/api/rti", {
-        method: "POST",
-        body: payload,
+      const res = await fetch(`/api/update-rti-status/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, reason }),
       });
-
-      if (!res.ok) throw new Error("Failed to submit RTI application");
-
+      if (!res.ok) throw new Error("Failed to update status");
       setSuccess(true);
-      setTimeout(() => {
-        router.push("/dashboard?tab=rti");
-      }, 2500);
-
+      setTimeout(() => router.push("/admin/dashboard?tab=rti"), 1500);
     } catch (err: any) {
-      setError(err.message || "An error occurred.");
-      setLoading(false);
+      alert(err.message);
+      setActionLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#f4feff] p-4 lg:p-8 font-sans">
       <div className="max-w-3xl mx-auto space-y-6">
-        
+
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Link href="/dashboard">
+          <Link href="/admin/dashboard?tab=rti">
             <button className="p-2 bg-white border border-[#b0d8db] rounded-lg hover:bg-[#e0f7f9] transition-colors" style={{ color: '#57737a' }}>
               <ArrowLeft size={20} />
             </button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: '#040f0f' }}>File Right to Information (RTI)</h1>
-            <p className="text-sm mt-1" style={{ color: '#57737a' }}>Request official information or documents directly from government departments.</p>
+            <h1 className="text-2xl font-bold" style={{ color: '#040f0f' }}>RTI Request Review</h1>
+            <p className="text-sm mt-1" style={{ color: '#57737a' }}>Officially evaluate and resolve citizen information requests.</p>
           </div>
         </div>
 
         <AnimatePresence mode="wait">
           {success ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
               className="bg-white rounded-2xl border border-[#b0d8db] shadow-sm p-12 flex flex-col items-center text-center"
             >
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
                 <CheckCircle2 className="w-10 h-10 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold mb-2" style={{ color: '#040f0f' }}>RTI Application Submitted!</h2>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#040f0f' }}>RTI Application Processed</h2>
               <p className="text-[#57737a] max-w-md">
-                Your request has been securely forwarded to the respective department. You can track its status in your dashboard.
+                The administrative decision has been securely logged. Returning to dashboard...
               </p>
             </motion.div>
           ) : (
-            <motion.form 
-              onSubmit={handleSubmit}
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-2xl border border-[#b0d8db] shadow-sm overflow-hidden"
             >
               {/* Form Banner */}
-              <div className="px-6 py-4 flex items-center gap-3" style={{ backgroundColor: '#e0f7f9', borderBottom: '1px solid #b0d8db' }}>
-                <div className="p-2 bg-white rounded-lg"><Building2 size={20} style={{ color: '#57737a' }}/></div>
-                <p className="text-sm font-bold" style={{ color: '#040f0f' }}>Section 6(1) of the RTI Act, 2005</p>
+              <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: '#e0f7f9', borderBottom: '1px solid #b0d8db' }}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white rounded-lg"><Building2 size={20} style={{ color: '#57737a' }} /></div>
+                  <p className="text-sm font-bold" style={{ color: '#040f0f' }}>Request Details view</p>
+                </div>
+                <div className="text-xs font-mono font-bold px-3 py-1 rounded bg-white" style={{ color: '#85bdbf', border: '1px solid #b0d8db' }}>
+                  #{id}
+                </div>
               </div>
 
               <div className="p-6 md:p-8 space-y-6">
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-center gap-2">
-                    <AlertCircle size={16} /> {error}
+                {loading ? (
+                  <div className="flex justify-center p-8"><Loader2 className="animate-spin text-slate-400" /></div>
+                ) : error ? (
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm text-center">
+                    {error}
+                  </div>
+                ) : rtiData && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-4 rounded-xl" style={{ backgroundColor: '#f4feff', border: '1px solid #b0d8db' }}>
+                        <div className="text-xs uppercase font-bold mb-1" style={{ color: '#85bdbf' }}>Target Department</div>
+                        <div className="font-bold" style={{ color: '#040f0f' }}>{rtiData.department}</div>
+                      </div>
+                      <div className="p-4 rounded-xl" style={{ backgroundColor: '#f4feff', border: '1px solid #b0d8db' }}>
+                        <div className="text-xs uppercase font-bold mb-1" style={{ color: '#85bdbf' }}>Citizen ID</div>
+                        <div className="font-bold font-mono text-sm" style={{ color: '#040f0f' }}>
+                          {rtiData.is_anonymous ? "Anonymous" : rtiData.user_id}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs uppercase font-bold mb-2 pl-1" style={{ color: '#57737a' }}>Subject line</div>
+                      <div className="w-full p-4 rounded-xl font-bold bg-white" style={{ border: '1px solid #b0d8db', color: '#040f0f' }}>
+                        {rtiData.title}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs uppercase font-bold mb-2 pl-1" style={{ color: '#57737a' }}>Detailed Query / Information Requested</div>
+                      <div className="w-full p-4 rounded-xl bg-white whitespace-pre-wrap" style={{ border: '1px solid #b0d8db', color: '#040f0f', minHeight: '120px' }}>
+                        {rtiData.description}
+
+                        {rtiData.questions && rtiData.questions.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-dashed border-[#b0d8db]">
+                            <p className="text-xs font-bold uppercase mb-2">Specific Questions:</p>
+                            <ul className="list-disc pl-5 text-sm space-y-1">
+                              {rtiData.questions.map((q: string, i: number) => <li key={i}>{q}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Panel */}
+                    <div className="pt-6 mt-6 flex flex-col sm:flex-row gap-3 justify-end" style={{ borderTop: '1px solid #e0f7f9' }}>
+                      <button
+                        onClick={() => setRejectModalOpen(true)}
+                        disabled={actionLoading}
+                        className="px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <XCircle size={18} /> Reject
+                      </button>
+                      <button
+                        onClick={() => handleAction('Pending')}
+                        disabled={actionLoading}
+                        className="px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 disabled:opacity-50"
+                      >
+                        <Clock size={18} /> Wait / Review
+                      </button>
+                      <button
+                        onClick={() => handleAction('Approved')}
+                        disabled={actionLoading}
+                        className="px-8 py-3 font-bold rounded-xl text-white transition-all flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 shadow-md disabled:opacity-50"
+                      >
+                        {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> Accept</>}
+                      </button>
+                    </div>
+
                   </div>
                 )}
-
-                {/* Linked Evidence Section (The Hackathon Winner Feature) */}
-                <div className="p-5 rounded-xl border-2 border-dashed" style={{ borderColor: '#b0d8db', backgroundColor: '#f4feff' }}>
-                  <label className="block text-sm font-bold mb-2 flex items-center gap-2" style={{ color: '#040f0f' }}>
-                    <LinkIcon size={16} style={{ color: '#85bdbf' }}/> Attach Verified Evidence (Highly Recommended)
-                  </label>
-                  <p className="text-xs mb-4" style={{ color: '#57737a' }}>Linking an AI-Verified report drastically increases response rate and accountability.</p>
-                  
-                  {loadingReports ? (
-                    <div className="text-sm text-slate-400">Loading your verified reports...</div>
-                  ) : verifiedReports.length === 0 ? (
-                    <div className="text-sm italic" style={{ color: '#85bdbf' }}>No verified reports available to link yet.</div>
-                  ) : (
-                    <select 
-                      name="linkedReportId" 
-                      value={formData.linkedReportId} 
-                      onChange={handleChange}
-                      className="w-full p-3 rounded-xl focus:outline-none bg-white transition-all"
-                      style={{ border: '1px solid #b0d8db', color: formData.linkedReportId ? '#040f0f' : '#57737a' }}
-                    >
-                      <option value="">-- Do not link any evidence --</option>
-                      {verifiedReports.map(report => (
-                        <option key={report.id} value={report.id}>
-                          {report.category} ({report.ai_risk_level} Risk) - {new Date(report.created_at).toLocaleDateString()}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold mb-2" style={{ color: '#040f0f' }}>Target Department</label>
-                    <select 
-                      name="department" 
-                      value={formData.department} 
-                      onChange={handleChange}
-                      className="w-full p-3 rounded-xl focus:outline-none transition-all"
-                      style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }}
-                    >
-                      <option>Municipal Corporation (MCGM)</option>
-                      <option>Public Works Department (PWD)</option>
-                      <option>Water Supply Board</option>
-                      <option>Electricity & Power Board</option>
-                      <option>Urban Development Authority</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold mb-2" style={{ color: '#040f0f' }}>Subject</label>
-                    <input 
-                      required type="text" name="subject"
-                      value={formData.subject} onChange={handleChange}
-                      placeholder="e.g. Budget breakdown for Dadar Skywalk"
-                      className="w-full p-3 rounded-xl focus:outline-none transition-all"
-                      style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold mb-2" style={{ color: '#040f0f' }}>Detailed Query / Information Required</label>
-                  <textarea 
-                    required name="query" rows={6}
-                    value={formData.query} onChange={handleChange}
-                    placeholder="I, a citizen of India, kindly request the following information under the RTI Act, 2005..."
-                    className="w-full p-3 rounded-xl focus:outline-none transition-all resize-none"
-                    style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold mb-2" style={{ color: '#040f0f' }}>Additional Documents (Optional)</label>
-                  <div className="flex items-center gap-4">
-                    <button 
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 bg-white rounded-lg flex items-center gap-2 font-medium transition-colors hover:bg-slate-50"
-                      style={{ border: '1px solid #b0d8db', color: '#57737a' }}
-                    >
-                      <Paperclip size={16} /> Choose File
-                    </button>
-                    <span className="text-sm font-mono truncate max-w-[200px]" style={{ color: '#85bdbf' }}>
-                      {formData.file ? formData.file.name : "No file chosen"}
-                    </span>
-                    {formData.file && (
-                      <button type="button" onClick={() => setFormData({...formData, file: null})} className="text-red-400 hover:text-red-600">
-                        <X size={16} />
-                      </button>
-                    )}
-                    <input 
-                      type="file" ref={fileInputRef} onChange={handleFileChange}
-                      className="hidden" accept=".pdf,.jpg,.jpeg,.png" 
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 flex justify-end" style={{ borderTop: '1px solid #e0f7f9' }}>
-                  <button 
-                    type="submit" disabled={loading || !formData.subject || !formData.query}
-                    className="px-6 py-3 font-bold rounded-xl text-white transition-all flex items-center gap-2 disabled:opacity-50"
-                    style={{ backgroundColor: '#57737a', boxShadow: '0 4px 14px rgba(87, 115, 122, 0.2)' }}
-                  >
-                    {loading ? (
-                      <><Loader2 size={18} className="animate-spin" /> Processing...</>
-                    ) : (
-                      <><Send size={18} /> Submit Application</>
-                    )}
-                  </button>
-                </div>
-
               </div>
-            </motion.form>
+            </motion.div>
           )}
         </AnimatePresence>
+
+        {/* REJECTION REASON MODAL */}
+        <AnimatePresence>
+          {rejectModalOpen && (
+            <div className="fixed inset-0 z-[999] bg-[#040f0f]/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" style={{ border: '1px solid #b0d8db' }}>
+                <h3 className="text-xl font-bold mb-2" style={{ color: '#040f0f' }}>Reject RTI Request</h3>
+                <p className="text-sm mb-4" style={{ color: '#57737a' }}>Please provide an official contextual reason for rejecting this information request. This will be publicly visible to the citizen.</p>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full p-4 rounded-xl focus:outline-none mb-4 min-h-[120px] resize-none"
+                  style={{ border: '1px solid #b0d8db', backgroundColor: '#f4feff', color: '#040f0f' }}
+                  placeholder="e.g. Request falls outside the jurisdiction of this department..."
+                  autoFocus
+                />
+                <div className="flex justify-end gap-3 pt-2">
+                  <button onClick={() => setRejectModalOpen(false)} className="px-5 py-2.5 font-bold transition-all rounded-xl" style={{ color: '#57737a', backgroundColor: '#e0f7f9' }}>Cancel</button>
+                  <button
+                    onClick={() => { setRejectModalOpen(false); handleAction('Rejected', rejectReason); }}
+                    disabled={!rejectReason.trim() || actionLoading}
+                    className="px-5 py-2.5 font-bold bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 transition-all flex items-center gap-2"
+                  >
+                    <XCircle size={18} /> Confirm Rejection
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   );

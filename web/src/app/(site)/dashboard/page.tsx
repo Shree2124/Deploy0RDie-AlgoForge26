@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,7 +10,7 @@ import {
   LogOut, TrendingUp, ShieldCheck, Activity, BarChart3, Clock, ChevronRight,
   Eye, EyeOff, Lock, FileBarChart
 } from "lucide-react";
-import { OfficialRecord, ProjectCategory } from "@/types/types";
+import { OfficialRecord, Report, RiskLevel } from "@/types/types";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase/client";
 
@@ -32,18 +32,7 @@ const MapVisualizer = dynamic(
 );
 
 // --- MOCK DATA ---
-const MOCK_RECORDS: OfficialRecord[] = [
-  {
-    id: "MCGM-001", projectName: "Marine Drive Resurfacing", category: ProjectCategory.ROAD,
-    budget: 45000000, contractor: "Mumbai Infra Ltd", deadline: "2024-06-30",
-    status: "Completed", location: { lat: 18.944, lng: 72.823 }, description: "Resurfacing of promenade.",
-  },
-  {
-    id: "MCGM-002", projectName: "Dadar Skywalk Repair", category: ProjectCategory.BUILDING,
-    budget: 12000000, contractor: "Urban Connect", deadline: "2024-08-15",
-    status: "In Progress", location: { lat: 19.0178, lng: 72.8478 }, description: "Structural reinforcement.",
-  },
-];
+// MOCK_RECORDS removed — records are now fetched dynamically from /api/records
 
 interface DashboardPageProps {
   activeTab?: string;
@@ -74,6 +63,9 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
   const [loadingReports, setLoadingReports] = useState(true);
   const [myRtiRequests, setMyRtiRequests] = useState<any[]>([]);
   const [loadingRti, setLoadingRti] = useState(true);
+  const [records, setRecords] = useState<OfficialRecord[]>([]);
+  const [allReports, setAllReports] = useState<any[]>([]);
+  const [locating, setLocating] = useState(false);
 
   // VERIFICATION MODAL STATE
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -141,7 +133,54 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
 
     fetchReports();
     fetchRtiRequests();
+
+    // Fetch ALL reports (all users) for the map
+    supabase
+      .from('citizen_reports')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!error && data) setAllReports(data);
+      });
+
+    // Fetch Official Records from API
+    fetch('/api/records')
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setRecords(data))
+      .catch(() => { });
   }, [user]);
+
+  // --- TRANSFORM ALL REPORTS TO MAP Report[] FORMAT (shows everyone's reports) ---
+  const mapReports: Report[] = useMemo(() => {
+    return allReports
+      .filter((r: any) => r.latitude != null && r.longitude != null)
+      .map((r: any) => {
+        const riskMap: Record<string, RiskLevel> = {
+          'High': RiskLevel.HIGH,
+          'Medium': RiskLevel.MEDIUM,
+          'Low': RiskLevel.LOW,
+        };
+        return {
+          id: r.id,
+          evidence: {
+            image: r.image_url || '',
+            timestamp: new Date(r.created_at).getTime(),
+            coordinates: { lat: r.latitude, lng: r.longitude },
+            userComment: r.notes || undefined,
+          },
+          auditResult: r.ai_risk_level
+            ? {
+              riskLevel: riskMap[r.ai_risk_level] || RiskLevel.UNKNOWN,
+              discrepancies: r.ai_discrepancies || [],
+              reasoning: r.ai_verdict || '',
+              confidenceScore: 0.8,
+            }
+            : undefined,
+          status: r.status === 'Verified' ? 'Verified' as const : r.status === 'Audited' ? 'Audited' as const : 'Pending' as const,
+          category: r.category || 'Other',
+        };
+      });
+  }, [allReports]);
 
   // Protected Action Handler
   const handleProtectedAction = (pathOrTab: string) => {
@@ -453,14 +492,34 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                       <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#85bdbf' }}></div>
                       <span className="text-xs font-bold" style={{ color: '#040f0f' }}>Live Infrastructure Map</span>
                     </div>
-                    <Link href="/mapview" className="text-[10px] font-bold flex items-center gap-1 transition-colors" style={{ color: '#85bdbf' }}>
-                      Full View <ChevronRight size={12} />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setLocating(true);
+                          navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                              setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                              setLocating(false);
+                            },
+                            () => setLocating(false),
+                            { enableHighAccuracy: true }
+                          );
+                        }}
+                        className="p-1.5 rounded-full transition-all hover:scale-105"
+                        style={{ backgroundColor: userLocation ? '#dbeafe' : '#e0f7f9', border: '1px solid #b0d8db' }}
+                        title="Show my location"
+                      >
+                        <LocateFixed size={14} className={locating ? 'animate-spin' : ''} style={{ color: userLocation ? '#2563eb' : '#57737a' }} />
+                      </button>
+                      <Link href="/mapview" className="text-[10px] font-bold flex items-center gap-1 transition-colors" style={{ color: '#85bdbf' }}>
+                        Full View <ChevronRight size={12} />
+                      </Link>
+                    </div>
                   </div>
                   <div className="flex-1">
                     <MapVisualizer
-                      records={MOCK_RECORDS}
-                      reports={[]}
+                      records={records}
+                      reports={mapReports}
                       onRecordSelect={setSelectedRecord}
                       userLocation={userLocation}
                     />
@@ -484,11 +543,11 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                       className="text-[10px] px-2 py-0.5 rounded-full font-medium"
                       style={{ backgroundColor: '#e0f7f9', color: '#57737a' }}
                     >
-                      {MOCK_RECORDS.length} Active
+                      {records.length} Active
                     </span>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                    {MOCK_RECORDS.map((record) => (
+                    {records.map((record) => (
                       <div
                         key={record.id}
                         onClick={() => setSelectedRecord(record)}
@@ -639,7 +698,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                     <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#e0f7f9' }}>
                       <div className="h-full rounded-full" style={{ width: '72%', backgroundColor: '#85bdbf' }}></div>
                     </div>
-                    <p className="text-[10px] mt-2" style={{ color: '#57737a' }}>Based on {MOCK_RECORDS.length} active projects in your area</p>
+                    <p className="text-[10px] mt-2" style={{ color: '#57737a' }}>Based on {records.length} active projects in your area</p>
                   </div>
                 </div>
               </div>
@@ -763,13 +822,18 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                           <FileText size={24} style={{ color: '#57737a' }} />
                         </div>
                         <span
-                          className="px-2 py-1 rounded text-xs font-bold"
-                          style={{ backgroundColor: '#e0f7f9', color: '#57737a' }}
+                          className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${doc.status === 'Approved' ? 'bg-green-100 text-green-700' : doc.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}
                         >
                           {doc.status}
                         </span>
                       </div>
                       <h3 className="text-lg font-bold mb-1 truncate" style={{ color: '#040f0f' }}>{doc.title}</h3>
+                      {doc.status === 'Rejected' && doc.extract_data?.rejection_reason && (
+                        <div className="mb-3 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-800 flex items-start gap-2">
+                          <AlertTriangle size={16} className="shrink-0 mt-0.5 text-red-600" />
+                          <div><strong className="block mb-0.5">Admin Rejection Reason:</strong>{doc.extract_data.rejection_reason}</div>
+                        </div>
+                      )}
                       <p className="text-xs font-mono mb-4" style={{ color: '#57737a' }}>{doc.department}</p>
                       <p className="text-xs font-mono mb-4" style={{ color: '#85bdbf' }}>
                         ID: {doc.id} • {new Date(doc.created_at).toLocaleDateString()}

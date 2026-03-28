@@ -52,7 +52,6 @@ const MAP_OVERLAYS: { id: MapOverlay; label: string; icon: React.ElementType; de
   { id: "none", label: "Standard", icon: MapIcon, description: "Standard marker view" },
   { id: "heatmap", label: "Heatmap", icon: Thermometer, description: "Activity intensity zones" },
   { id: "cluster", label: "Cluster", icon: Circle, description: "Grouped marker clusters" },
-  { id: "density", label: "Population", icon: Users, description: "Population density overlay" },
 ];
 
 export default function MapPage() {
