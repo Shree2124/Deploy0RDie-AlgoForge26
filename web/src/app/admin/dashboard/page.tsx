@@ -5,10 +5,13 @@ import Link from "next/link";
 import {
   AlertTriangle, Settings, Search, CheckCircle2,
   TrendingUp, ShieldAlert, MoreHorizontal, Building2,
-  Map as MapIcon, ChevronRight, ShieldCheck, XCircle, LocateFixed
+  Map as MapIcon, ChevronRight, ShieldCheck, XCircle, LocateFixed, Users, Filter
 } from "lucide-react";
 import { OfficialRecord, ProjectCategory, Report, RiskLevel } from "@/types/types";
 import { supabase } from "@/lib/supabase/client";
+
+// Import Recharts for AI Insights
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
 // --- ERROR BOUNDARY FOR LEAFLET ISSUES ---
 class MapErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -43,28 +46,15 @@ const MapVisualizer = dynamic(() => import("@/components/MapView/Mapvisualizer")
   ),
 });
 
-// --- MOCK DATA (Kept for Map, RTI, Contractors & System to preserve your UI) ---
+// --- MOCK DATA FOR STATIC WIDGETS ---
 const MOCK_RECORDS: OfficialRecord[] = [
   { id: "MCGM-001", projectName: "Marine Drive Resurfacing", category: ProjectCategory.ROAD, budget: 45000000, contractor: "Mumbai Infra Ltd", deadline: "2024-06-30", status: "Completed", location: { lat: 18.944, lng: 72.823 }, description: "Resurfacing." },
   { id: "MCGM-002", projectName: "Dadar Skywalk Repair", category: ProjectCategory.BUILDING, budget: 12000000, contractor: "Urban Connect", deadline: "2024-08-15", status: "In Progress", location: { lat: 19.0178, lng: 72.8478 }, description: "Repair." },
 ];
 
-const MOCK_USERS = [
-  { id: 1, name: "Rahul S.", email: "rahul@example.com", role: "Citizen", status: "Active" },
-  { id: 2, name: "Admin User", email: "admin@civic.ai", role: "Admin", status: "Active" },
-  { id: 3, name: "Bot Account", email: "spam@bot.com", role: "Citizen", status: "Flagged" },
-];
-
-const MOCK_RTI_REQUESTS = [
-  { id: "RTI-2025-101", subject: "Request for Tender Docs - Dadar Skywalk", citizen: "Rahul S.", status: "Pending Review", date: "2025-10-12" },
-  { id: "RTI-2025-102", subject: "Road Budget Inquiry - Andheri", citizen: "Anjali M.", status: "Approved", date: "2025-10-10" },
-  { id: "RTI-2025-103", subject: "Drainage Contract Details", citizen: "Vikram R.", status: "Rejected", date: "2025-10-08" },
-];
-
 export default function AdminDashboardPage({ activeTab = "overview" }: { activeTab?: string }) {
   const tab = activeTab;
 
-  // --- DYNAMIC DATA STATE ---
   const [reports, setReports] = useState<any[]>([]);
   const [records, setRecords] = useState<OfficialRecord[]>([]);
   const [verifications, setVerifications] = useState<any[]>([]);
@@ -73,9 +63,14 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
 
-  // Fetch Live Reports & Verifications from Database
+  const [totalCitizens, setTotalCitizens] = useState<number>(0);
+
+  const [issueSearchTerm, setIssueSearchTerm] = useState("");
+  const [issueRiskFilter, setIssueRiskFilter] = useState("All");
+
   useEffect(() => {
     const fetchData = async () => {
+      // 1. Fetch Admin Reports
       try {
         const reportsRes = await fetch('/api/admin/reports');
         if (reportsRes.ok) {
@@ -86,7 +81,7 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
         console.error('Failed to fetch admin reports:', e);
       }
 
-      // Fetch Profiles that have submitted Aadhar
+      // 2. Fetch KYC Verifications
       const { data: verifyData, error: verifyError } = await supabase
         .from('profiles')
         .select('*')
@@ -97,7 +92,16 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
         setVerifications(verifyData);
       }
 
-      // Fetch Official Records
+      // 3. Fetch Total Citizen Count
+      const { count: profileCount, error: profileCountError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (!profileCountError && profileCount !== null) {
+        setTotalCitizens(profileCount);
+      }
+
+      // 4. Fetch Official Records
       try {
         const recordsRes = await fetch('/api/records');
         if (recordsRes.ok) {
@@ -108,24 +112,16 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
         console.error('Failed to fetch records:', e);
       }
 
-      // Fetch RTI Requests
+      // 5. Fetch RTI Requests
       try {
         const rtiRes = await fetch(`/api/get-rti?timestamp=${Date.now()}`, { cache: 'no-store' });
         if (rtiRes.ok) {
           const rtiData = await rtiRes.json();
-          console.log("==> RAW RTI DATA FROM API:", rtiData);
           const finalData = rtiData.data ? rtiData.data : rtiData;
-          if (Array.isArray(finalData)) {
-            setRtiRequests(finalData);
-          } else {
-            console.error("==> Still not an array after fallback!", finalData);
-            setRtiRequests([]);
-          }
-        } else {
-          console.error("==> Fetch failed", rtiRes.status);
+          if (Array.isArray(finalData)) setRtiRequests(finalData);
         }
       } catch (e) {
-        console.error('Failed to fetch RTI requests on the client:', e);
+        console.error('Failed to fetch RTI requests:', e);
       }
 
       setLoading(false);
@@ -133,44 +129,64 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
     fetchData();
   }, []);
 
-  // --- TRANSFORM DB REPORTS TO MAP Report[] FORMAT ---
   const mapReports: Report[] = useMemo(() => {
     return reports
       .filter((r: any) => r.latitude != null && r.longitude != null)
       .map((r: any) => {
         const riskMap: Record<string, RiskLevel> = {
-          'High': RiskLevel.HIGH,
-          'Medium': RiskLevel.MEDIUM,
-          'Low': RiskLevel.LOW,
+          'High': RiskLevel.HIGH, 'Medium': RiskLevel.MEDIUM, 'Low': RiskLevel.LOW,
         };
         return {
           id: r.id,
-          evidence: {
-            image: r.image_url || '',
-            timestamp: new Date(r.created_at).getTime(),
-            coordinates: { lat: r.latitude, lng: r.longitude },
-            userComment: r.notes || undefined,
-          },
-          auditResult: r.ai_risk_level
-            ? {
-              riskLevel: riskMap[r.ai_risk_level] || RiskLevel.UNKNOWN,
-              discrepancies: r.ai_discrepancies || [],
-              reasoning: r.ai_verdict || '',
-              confidenceScore: 0.8,
-            }
-            : undefined,
+          evidence: { image: r.image_url || '', timestamp: new Date(r.created_at).getTime(), coordinates: { lat: r.latitude, lng: r.longitude }, userComment: r.notes || undefined },
+          auditResult: r.ai_risk_level ? { riskLevel: riskMap[r.ai_risk_level] || RiskLevel.UNKNOWN, discrepancies: r.ai_discrepancies || [], reasoning: r.ai_verdict || '', confidenceScore: 0.8 } : undefined,
           status: r.status === 'Verified' ? 'Verified' as const : r.status === 'Audited' ? 'Audited' as const : 'Pending' as const,
           category: r.category || 'Other',
         };
       });
   }, [reports]);
 
-  // --- DERIVED STATS ---
   const highRiskIssues = reports.filter((r) => r.ai_risk_level === 'High');
   const resolvedIssues = reports.filter((r) => r.status === 'Resolved');
-  const pendingVerifications = verifications.filter(v => v.verification_status === 'Pending');
 
-  // Contractor Stats Logic
+  const pendingVerifications = verifications.filter(v => v.verification_status === 'Pending').length;
+  const verifiedUsers = verifications.filter(v => v.verification_status === 'Approved').length;
+
+  // --- 100% DYNAMIC PIE CHART DATA ---
+  const pieData = useMemo(() => {
+    const categoryCounts: Record<string, number> = {};
+
+    reports.forEach(r => {
+      // Handle cases where category might be null or undefined in old DB entries
+      const cat = r.category || "Other";
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    });
+
+    // Convert object to array and sort by highest value first
+    return Object.entries(categoryCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [reports]);
+
+  // Consistent Color Mapping for Categories
+  const CATEGORY_COLORS: Record<string, string> = {
+    "General": "#ef4444",              // Red
+    "Road & Potholes": "#f59e0b",      // Orange
+    "Electricity & Streetlights": "#85bdbf", // Teal/Light Blue
+    "Water & Sewage": "#10b981",       // Green
+    "Building & Construction": "#57737a", // Dark Teal
+    "Other": "#64748b"                 // Slate
+  };
+  const FALLBACK_COLORS = ['#57737a', '#85bdbf', '#f59e0b', '#ef4444', '#10b981'];
+
+  const filteredIssues = reports.filter(r => {
+    const matchesSearch =
+      (r.category || "").toLowerCase().includes(issueSearchTerm.toLowerCase()) ||
+      (r.id || "").toLowerCase().includes(issueSearchTerm.toLowerCase());
+    const matchesRisk = issueRiskFilter === "All" ? true : (r.ai_risk_level || 'Pending') === issueRiskFilter;
+    return matchesSearch && matchesRisk;
+  });
+
   const contractorStats: Record<string, { id: string; total: number; highRisk: number; budget: number }> = {};
   MOCK_RECORDS.forEach((rec) => {
     if (!contractorStats[rec.contractor]) {
@@ -179,15 +195,14 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
     }
     contractorStats[rec.contractor].total += 1;
     contractorStats[rec.contractor].budget += rec.budget;
-    contractorStats[rec.contractor].highRisk += 1; // Mocking risk for UI
+    contractorStats[rec.contractor].highRisk += 1;
   });
 
-  // Handle KYC Actions
   const handleVerifyAction = async (userId: string, status: 'Approved' | 'Rejected') => {
     let reason = null;
     if (status === 'Rejected') {
       reason = prompt("Enter reason for KYC rejection:");
-      if (!reason) return; // Cancelled
+      if (!reason) return;
     }
 
     const { error } = await supabase.from('profiles').update({ verification_status: status, rejection_reason: reason }).eq('id', userId);
@@ -200,12 +215,11 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
     }
   };
 
-  // Handle Report Actions (Approve / Reject)
   const handleReportAction = async (reportId: string, status: 'Resolved' | 'Rejected') => {
     let reason = null;
     if (status === 'Rejected') {
       reason = prompt("Enter reason for report rejection:");
-      if (!reason) return; // Cancelled
+      if (!reason) return;
     }
 
     try {
@@ -253,10 +267,17 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
                 <div className="text-xs font-bold uppercase mb-1" style={{ color: "#57737a" }}>Issues Resolved</div>
                 <div className="text-3xl font-bold flex items-center gap-2" style={{ color: "#57737a" }}>{loading ? "..." : resolvedIssues.length} <CheckCircle2 size={20} /></div>
               </div>
-              <div className="p-5 rounded-xl shadow-sm" style={{ backgroundColor: "#040f0f", color: "#e8f9fa" }}>
-                <div className="text-xs font-bold uppercase mb-1" style={{ color: "#85bdbf" }}>System Health</div>
+              <div className="p-5 rounded-xl shadow-sm flex flex-col justify-between" style={{ backgroundColor: "#040f0f", color: "#e8f9fa" }}>
+                <div className="flex justify-between items-center mb-1">
+                  <div className="text-xs font-bold uppercase" style={{ color: "#85bdbf" }}>Total Citizens</div>
+                  <Users size={14} style={{ color: "#85bdbf" }} />
+                </div>
                 <div className="text-3xl font-bold flex items-center gap-2" style={{ color: "#c2fcf7" }}>
-                  99.9% <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: "#c2fcf7" }}></span>
+                  {loading ? "..." : totalCitizens.toLocaleString()}
+                </div>
+                <div className="text-[10px] font-semibold mt-1 flex justify-between">
+                  <span className="text-green-400">{verifiedUsers} Verified</span>
+                  <span className="text-amber-400">{pendingVerifications} Pending KYC</span>
                 </div>
               </div>
             </div>
@@ -274,17 +295,12 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
                       onClick={() => {
                         setLocating(true);
                         navigator.geolocation.getCurrentPosition(
-                          (pos) => {
-                            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                            setLocating(false);
-                          },
-                          () => setLocating(false),
-                          { enableHighAccuracy: true }
+                          (pos) => { setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+                          () => setLocating(false), { enableHighAccuracy: true }
                         );
                       }}
                       className="p-1.5 rounded-full transition-all hover:scale-105"
                       style={{ backgroundColor: userLocation ? '#dbeafe' : '#e0f7f9', border: '1px solid #b0d8db' }}
-                      title="Show my location"
                     >
                       <LocateFixed size={14} className={locating ? 'animate-spin' : ''} style={{ color: userLocation ? '#2563eb' : '#57737a' }} />
                     </button>
@@ -300,15 +316,57 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
                 </div>
               </div>
 
-              {/* AI INSIGHT CARD */}
-              <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden group transition-all cursor-default" style={{ border: "1px solid #b0d8db" }}>
-                <div className="p-6 relative z-10">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide mb-4" style={{ backgroundColor: "#e0f7f9", color: "#57737a", border: "1px solid #b0d8db" }}>
-                    <TrendingUp size={12} /> AI Insight
+              {/* AI INSIGHT PIE CHART CARD */}
+              <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm flex flex-col relative overflow-hidden" style={{ border: "1px solid #b0d8db" }}>
+                <div className="p-5 flex-1 flex flex-col relative z-10">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: "#e0f7f9", color: "#57737a", border: "1px solid #b0d8db" }}>
+                      <TrendingUp size={12} /> Issue Distribution
+                    </div>
                   </div>
-                  <h3 className="font-bold text-lg mb-2" style={{ color: "#040f0f" }}>Risk Anomaly in Zone 4</h3>
-                  <p className="text-sm leading-relaxed mb-4" style={{ color: "#57737a" }}>
-                    Our models detected a cluster of reports linked to <strong style={{ color: "#040f0f" }}>"Mumbai Infra"</strong>. Their discrepancy rate has spiked to <span className="text-red-600 font-bold bg-red-50 px-1 rounded">35%</span> this week.
+
+                  {/* Dynamic Recharts PieChart */}
+                  {pieData.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-sm font-medium" style={{ color: "#85bdbf" }}>
+                      No reports available yet.
+                    </div>
+                  ) : (
+                    <div className="w-full flex-1 min-h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={CATEGORY_COLORS[entry.name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#040f0f', color: '#fff', borderRadius: '8px', border: 'none' }}
+                            itemStyle={{ color: '#c2fcf7' }}
+                          />
+                          <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: '#57737a', fontWeight: '600' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  <p className="text-xs leading-relaxed mt-4 pt-3 border-t" style={{ color: "#57737a", borderColor: "#e0f7f9" }}>
+                    <strong style={{ color: "#040f0f" }}>AI Insight:</strong>
+                    {pieData.length > 0 ? (
+                      <> A high volume of reports are categorized under <strong style={{ color: "#040f0f" }}>{pieData[0].name}</strong> this week, signaling a potential systematic infrastructure anomaly.</>
+                    ) : (
+                      <> Insufficient data to generate insights. System monitoring is active.</>
+                    )}
                   </p>
                 </div>
               </div>
@@ -319,12 +377,42 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
         {/* VIEW: ISSUES */}
         {tab === "issues" && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Added Search and Filter Bar */}
+            <div className="bg-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center" style={{ border: "1px solid #b0d8db" }}>
+              <div className="relative w-full sm:w-96">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={16} style={{ color: "#57737a" }} />
+                <input
+                  type="text"
+                  placeholder="Search by Category or ID..."
+                  value={issueSearchTerm}
+                  onChange={(e) => setIssueSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm rounded-lg outline-none focus:ring-2"
+                  style={{ backgroundColor: "#f4feff", border: "1px solid #b0d8db", color: "#040f0f", '--tw-ring-color': '#85bdbf' } as any}
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Filter size={16} style={{ color: "#57737a" }} />
+                <select
+                  value={issueRiskFilter}
+                  onChange={(e) => setIssueRiskFilter(e.target.value)}
+                  className="text-sm p-2 rounded-lg outline-none cursor-pointer w-full sm:w-auto"
+                  style={{ backgroundColor: "#f4feff", border: "1px solid #b0d8db", color: "#040f0f" }}
+                >
+                  <option value="All">All Risks</option>
+                  <option value="High">High Risk</option>
+                  <option value="Medium">Medium Risk</option>
+                  <option value="Low">Low Risk</option>
+                  <option value="Pending">Pending AI</option>
+                </select>
+              </div>
+            </div>
+
             {loading ? (
               <div className="p-8 text-center text-slate-500 font-medium">Loading issues from the database...</div>
-            ) : reports.length === 0 ? (
-              <div className="p-8 text-center bg-white rounded-xl" style={{ color: "#57737a", border: "1px solid #b0d8db" }}>No issues reported yet.</div>
+            ) : filteredIssues.length === 0 ? (
+              <div className="p-8 text-center bg-white rounded-xl" style={{ color: "#57737a", border: "1px solid #b0d8db" }}>No matching issues found.</div>
             ) : (
-              reports.map((report) => (
+              filteredIssues.map((report) => (
                 <div key={report.id} className="bg-white p-5 rounded-xl shadow-sm flex flex-col md:flex-row justify-between items-start gap-4 hover:shadow-md transition-shadow" style={{ border: "1px solid #b0d8db" }}>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -461,89 +549,6 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {/* VIEW: CONTRACTORS */}
-        {tab === "contractors" && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ border: "1px solid #b0d8db" }}>
-            <table className="w-full text-left">
-              <thead className="text-xs font-bold uppercase" style={{ backgroundColor: "#f4feff", borderBottom: "1px solid #b0d8db", color: "#57737a" }}>
-                <tr><th className="px-6 py-4">Contractor</th><th className="px-6 py-4">Projects</th><th className="px-6 py-4">Budget Managed</th><th className="px-6 py-4">Risk Profile</th><th className="px-6 py-4 text-right">Actions</th></tr>
-              </thead>
-              <tbody style={{ borderColor: "#e0f7f9" }} className="divide-y">
-                {Object.entries(contractorStats).map(([name, stat], idx) => {
-                  const riskPercentage = stat.total > 0 ? (stat.highRisk / stat.total) * 100 : 0;
-                  return (
-                    <tr key={idx} className="transition-colors hover:bg-[#f4feff]">
-                      <td className="px-6 py-4"><Link href={`/admin/contractor/${stat.id}`} className="font-bold hover:underline" style={{ color: "#040f0f" }}>{name}</Link></td>
-                      <td className="px-6 py-4 text-sm" style={{ color: "#57737a" }}>{stat.total} Active</td>
-                      <td className="px-6 py-4 font-mono text-sm" style={{ color: "#85bdbf" }}>₹{(stat.budget / 10000000).toFixed(2)} Cr</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-24 h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#e0f7f9" }}>
-                            <div className={`h-full rounded-full ${riskPercentage > 30 ? "bg-red-500" : "bg-[#57737a]"}`} style={{ width: `${Math.max(riskPercentage, 5)}%` }} />
-                          </div>
-                          <span className={`text-xs font-bold ${riskPercentage > 30 ? "text-red-600" : "text-[#57737a]"}`}>{riskPercentage.toFixed(0)}% Risk</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right"><button className="hover:opacity-75" style={{ color: "#57737a" }}><MoreHorizontal size={20} /></button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* VIEW: SYSTEM ADMIN */}
-        {tab === "system" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden" style={{ border: "1px solid #b0d8db" }}>
-              <div className="px-6 py-4 flex justify-between items-center" style={{ backgroundColor: "#e0f7f9", borderBottom: "1px solid #b0d8db" }}>
-                <h3 className="font-bold" style={{ color: "#040f0f" }}>User Management</h3>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1.5" size={14} style={{ color: "#57737a" }} />
-                  <input type="text" placeholder="Search..." className="pl-7 pr-3 py-1 text-sm bg-white rounded-md focus:outline-none" style={{ border: "1px solid #b0d8db", color: "#040f0f" }} />
-                </div>
-              </div>
-              <table className="w-full text-left">
-                <thead className="text-xs font-bold uppercase" style={{ backgroundColor: "#f4feff", borderBottom: "1px solid #b0d8db", color: "#57737a" }}>
-                  <tr><th className="px-6 py-3">User</th><th className="px-6 py-3">Role</th><th className="px-6 py-3">Status</th><th className="px-6 py-3 text-right">Action</th></tr>
-                </thead>
-                <tbody style={{ borderColor: "#e0f7f9" }} className="divide-y">
-                  {MOCK_USERS.map((u) => (
-                    <tr key={u.id} className="hover:bg-[#f4feff]">
-                      <td className="px-6 py-3"><div className="font-medium text-sm" style={{ color: "#040f0f" }}>{u.name}</div><div className="text-xs" style={{ color: "#85bdbf" }}>{u.email}</div></td>
-                      <td className="px-6 py-3 text-sm" style={{ color: "#57737a" }}>{u.role}</td>
-                      <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${u.status === "Active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{u.status}</span></td>
-                      <td className="px-6 py-3 text-right"><button className="text-xs font-bold hover:underline" style={{ color: "#57737a" }}>Edit</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6" style={{ border: "1px solid #b0d8db" }}>
-              <h3 className="font-bold mb-6 flex items-center gap-2" style={{ color: "#040f0f" }}><Settings size={18} style={{ color: "#57737a" }} /> Platform Configuration</h3>
-              <div className="space-y-6">
-                {[
-                  { label: "Strict AI Verification", desc: "Higher confidence threshold (95%)", active: true },
-                  { label: "Anonymous Reporting", desc: "Allow reports without login", active: true },
-                  { label: "Maintenance Mode", desc: "Disable user submissions", active: false },
-                ].map((setting, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-bold" style={{ color: "#040f0f" }}>{setting.label}</div>
-                      <div className="text-xs" style={{ color: "#57737a" }}>{setting.desc}</div>
-                    </div>
-                    <div className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors ${setting.active ? "bg-[#57737a]" : "bg-[#e0f7f9]"}`}>
-                      <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${setting.active ? "right-1 shadow-sm" : "left-1 border border-[#b0d8db]"}`} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 
