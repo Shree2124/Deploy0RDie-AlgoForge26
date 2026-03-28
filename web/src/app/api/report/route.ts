@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     const description = formData.get('description') as string
     const category = formData.get('category') as string | null
     const userId = formData.get('userId') as string | null
+    const isAnonymous = formData.get('is_anonymous') === 'true'
 
     if (!evidence || isNaN(latitude) || isNaN(longitude)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -46,8 +47,9 @@ export async function POST(req: NextRequest) {
         longitude,
         notes: description,
         category: category || 'Other',
-        user_id: userId || null,
-        status: 'Pending AI' // Set initial status
+        user_id: isAnonymous ? null : (userId || null),
+        status: 'Verified', // Auto verified as requested
+        is_anonymous: isAnonymous
       })
       .select()
       .single()
