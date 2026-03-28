@@ -4,7 +4,7 @@
 ## Overview
 Citizens often face inconsistencies in public infrastructure, such as roads failing soon after repairs or facilities existing only in official records. Although public spending data is available, it is often buried in complex documents, making verification difficult.
 
-Project INTEGRITY (Civic.ai) is an AI-Powered Infrastructure Transparency Platform designed to eliminate the gap between government infrastructure records and on-ground reality. It acts as a digital anti-corruption layer for municipalities by combining Agentic AI, custom computer vision, geospatial data, and public documents into a single transparent system.
+Project Civic.ai is an AI-Powered Infrastructure Transparency Platform designed to eliminate the gap between government infrastructure records and on-ground reality. It acts as a digital anti-corruption layer for municipalities by combining Agentic AI, custom computer vision, geospatial data, and public documents into a single transparent system.
 
 ## Table of Contents
 - [The Problem](#the-problem)
