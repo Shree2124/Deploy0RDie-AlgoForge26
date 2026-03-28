@@ -37,7 +37,7 @@ export async function GET() {
                 riskLevel: riskMap[r.ai_risk_level] || RiskLevel.UNKNOWN,
                 discrepancies: r.ai_discrepancies || [],
                 reasoning: r.ai_verdict || '',
-                confidenceScore: 0.8,
+                confidenceScore: r.ai_detection,
               }
             : undefined,
           status: r.status === 'Verified' ? 'Verified' : r.status === 'Audited' ? 'Audited' : 'Pending',

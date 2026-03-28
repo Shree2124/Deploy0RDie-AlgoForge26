@@ -68,6 +68,19 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
   const [issueSearchTerm, setIssueSearchTerm] = useState("");
   const [issueRiskFilter, setIssueRiskFilter] = useState("All");
 
+  const getRiskLabel = (report: any) => {
+    if (!report.ai_risk_level) return "Pending AI";
+    return report.ai_risk_level;
+  };
+
+  const getMainIssueDetail = (report: any) => {
+    if (Array.isArray(report.ai_discrepancies) && report.ai_discrepancies.length > 0) {
+      return report.ai_discrepancies[0];
+    }
+    if (report.notes) return report.notes;
+    return "No details provided.";
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       // 1. Fetch Admin Reports
@@ -179,13 +192,39 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
   };
   const FALLBACK_COLORS = ['#57737a', '#85bdbf', '#f59e0b', '#ef4444', '#10b981'];
 
-  const filteredIssues = reports.filter(r => {
+  const sortedReports = useMemo(() => {
+    return [...reports].sort((a, b) => {
+      const aTime = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [reports]);
+
+  const filteredIssues = sortedReports.filter(r => {
     const matchesSearch =
       (r.category || "").toLowerCase().includes(issueSearchTerm.toLowerCase()) ||
-      (r.id || "").toLowerCase().includes(issueSearchTerm.toLowerCase());
-    const matchesRisk = issueRiskFilter === "All" ? true : (r.ai_risk_level || 'Pending') === issueRiskFilter;
+      (r.id || "").toLowerCase().includes(issueSearchTerm.toLowerCase()) ||
+      (r.notes || "").toLowerCase().includes(issueSearchTerm.toLowerCase());
+    const matchesRisk = issueRiskFilter === "All" ? true : getRiskLabel(r) === issueRiskFilter;
     return matchesSearch && matchesRisk;
   });
+
+  const issueRiskCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      High: 0,
+      Medium: 0,
+      Low: 0,
+      Unknown: 0,
+      "Pending AI": 0,
+    };
+
+    reports.forEach((r) => {
+      const label = getRiskLabel(r);
+      counts[label] = (counts[label] || 0) + 1;
+    });
+
+    return counts;
+  }, [reports]);
 
   const contractorStats: Record<string, { id: string; total: number; highRisk: number; budget: number }> = {};
   MOCK_RECORDS.forEach((rec) => {
@@ -267,7 +306,7 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
                 <div className="text-xs font-bold uppercase mb-1" style={{ color: "#57737a" }}>Issues Resolved</div>
                 <div className="text-3xl font-bold flex items-center gap-2" style={{ color: "#57737a" }}>{loading ? "..." : resolvedIssues.length} <CheckCircle2 size={20} /></div>
               </div>
-              <div className="p-5 rounded-xl shadow-sm flex flex-col justify-between" style={{ backgroundColor: "#040f0f", color: "#e8f9fa" }}>
+              <div className="p-5 rounded-xl shadow-sm flex flex-col justify-between" style={{ backgroundColor: "#1d6868ff", color: "#e8f9fa" }}>
                 <div className="flex justify-between items-center mb-1">
                   <div className="text-xs font-bold uppercase" style={{ color: "#85bdbf" }}>Total Citizens</div>
                   <Users size={14} style={{ color: "#85bdbf" }} />
@@ -402,8 +441,24 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
                   <option value="High">High Risk</option>
                   <option value="Medium">Medium Risk</option>
                   <option value="Low">Low Risk</option>
-                  <option value="Pending">Pending AI</option>
+                  <option value="Unknown">Unknown</option>
+                  <option value="Pending AI">Pending AI</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl shadow-sm" style={{ border: "1px solid #b0d8db" }}>
+              <div className="flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide">
+                <span className="px-2 py-1 rounded" style={{ backgroundColor: "#f4feff", color: "#57737a", border: "1px solid #b0d8db" }}>
+                  Total: {reports.length}
+                </span>
+                <span className="px-2 py-1 rounded bg-red-100 text-red-700">High: {issueRiskCounts.High || 0}</span>
+                <span className="px-2 py-1 rounded bg-orange-100 text-orange-700">Medium: {issueRiskCounts.Medium || 0}</span>
+                <span className="px-2 py-1 rounded bg-green-100 text-green-700">Low: {issueRiskCounts.Low || 0}</span>
+                <span className="px-2 py-1 rounded bg-slate-100 text-slate-700">Unknown: {issueRiskCounts.Unknown || 0}</span>
+                <span className="px-2 py-1 rounded" style={{ backgroundColor: "#e0f7f9", color: "#57737a" }}>
+                  Pending AI: {issueRiskCounts["Pending AI"] || 0}
+                </span>
               </div>
             </div>
 
@@ -412,47 +467,80 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
             ) : filteredIssues.length === 0 ? (
               <div className="p-8 text-center bg-white rounded-xl" style={{ color: "#57737a", border: "1px solid #b0d8db" }}>No matching issues found.</div>
             ) : (
-              filteredIssues.map((report) => (
-                <div key={report.id} className="bg-white p-5 rounded-xl shadow-sm flex flex-col md:flex-row justify-between items-start gap-4 hover:shadow-md transition-shadow" style={{ border: "1px solid #b0d8db" }}>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase flex items-center gap-1 ${report.ai_risk_level === 'High' ? "bg-red-100 text-red-700" : report.ai_risk_level === 'Medium' ? "bg-orange-100 text-orange-700" : "bg-[#e0f7f9] text-[#57737a]"}`}>
-                        {report.ai_risk_level === 'High' && <ShieldAlert size={12} />}
-                        {report.ai_risk_level || 'Pending'} Risk
-                      </span>
-                      <span className="text-xs font-mono" style={{ color: "#85bdbf" }}>#{report.id.substring(0, 8).toUpperCase()}</span>
-                      <span className="px-2 py-0.5 rounded text-xs font-bold border" style={{
-                        borderColor: report.status === 'Resolved' ? "#85bdbf" : "#b0d8db",
-                        backgroundColor: report.status === 'Resolved' ? "#e0f7f9" : "#f4feff",
-                        color: report.status === 'Resolved' ? "#57737a" : "#85bdbf"
-                      }}>
-                        {report.status}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold" style={{ color: "#040f0f" }}>{report.category}</h3>
-                    <p className="text-sm mt-1 p-3 rounded-lg inline-block" style={{ backgroundColor: "#f4feff", color: "#57737a", border: "1px solid #e0f7f9" }}>
-                      <span className="font-bold" style={{ color: "#040f0f" }}>Discrepancy:</span> "{report.ai_discrepancies ? report.ai_discrepancies[0] : report.notes}"
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2 min-w-[160px]">
-                    <Link href={`/admin/reports/${report.id}`}>
-                      <button className="px-4 py-2 text-sm rounded-lg font-medium w-full text-left flex justify-between items-center group transition-colors" style={{ backgroundColor: "#e0f7f9", color: "#040f0f" }}>
-                        View Details <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </Link>
-                    {report.status !== 'Resolved' && report.status !== 'Rejected' && (
-                      <div className="flex gap-2">
-                        <button onClick={() => handleReportAction(report.id, 'Resolved')} className="flex-1 py-1.5 px-3 text-[11px] uppercase tracking-wider rounded font-bold bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-200 shadow-sm">
-                          Approve
-                        </button>
-                        <button onClick={() => handleReportAction(report.id, 'Rejected')} className="flex-1 py-1.5 px-3 text-[11px] uppercase tracking-wider rounded font-bold bg-red-50 text-red-700 hover:bg-red-100 transition-colors border border-red-200 shadow-sm">
-                          Reject
-                        </button>
+              <div className="space-y-3">
+                {filteredIssues.map((report) => {
+                  const riskLabel = getRiskLabel(report);
+                  const riskBadgeClass =
+                    riskLabel === "High"
+                      ? "bg-red-100 text-red-700"
+                      : riskLabel === "Medium"
+                        ? "bg-orange-100 text-orange-700"
+                        : riskLabel === "Low"
+                          ? "bg-green-100 text-green-700"
+                          : riskLabel === "Unknown"
+                            ? "bg-slate-100 text-slate-700"
+                            : "bg-[#e0f7f9] text-[#57737a]";
+
+                  return (
+                    <div key={report.id} className="bg-white p-5 rounded-xl shadow-sm flex flex-col md:flex-row justify-between items-start gap-4 hover:shadow-md transition-shadow" style={{ border: "1px solid #b0d8db" }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase flex items-center gap-1 ${riskBadgeClass}`}>
+                            {riskLabel === "High" && <ShieldAlert size={12} />}
+                            {riskLabel}
+                          </span>
+                          <span className="text-xs font-mono" style={{ color: "#85bdbf" }}>#{report.id?.substring(0, 8).toUpperCase()}</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-bold border" style={{
+                            borderColor: report.status === 'Resolved' ? "#85bdbf" : "#b0d8db",
+                            backgroundColor: report.status === 'Resolved' ? "#e0f7f9" : "#f4feff",
+                            color: report.status === 'Resolved' ? "#57737a" : "#85bdbf"
+                          }}>
+                            {report.status || "Pending"}
+                          </span>
+                        </div>
+
+                        <h3 className="text-lg font-bold" style={{ color: "#040f0f" }}>
+                          {report.category || "General"}
+                        </h3>
+
+                        <div className="mt-2 text-sm p-3 rounded-lg" style={{ backgroundColor: "#f4feff", color: "#57737a", border: "1px solid #e0f7f9" }}>
+                          <p>
+                            <span className="font-bold" style={{ color: "#040f0f" }}>Main Detail:</span> {getMainIssueDetail(report)}
+                          </p>
+                          {report.notes && (
+                            <p className="mt-1">
+                              <span className="font-bold" style={{ color: "#040f0f" }}>Citizen Note:</span> {report.notes}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-2 text-xs flex flex-wrap gap-x-4 gap-y-1" style={{ color: "#57737a" }}>
+                          <span><strong style={{ color: "#040f0f" }}>Reported:</strong> {report.created_at ? new Date(report.created_at).toLocaleString() : "N/A"}</span>
+                          <span><strong style={{ color: "#040f0f" }}>Location:</strong> {report.latitude != null && report.longitude != null ? `${Number(report.latitude).toFixed(5)}, ${Number(report.longitude).toFixed(5)}` : "N/A"}</span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))
+
+                      <div className="flex flex-col gap-2 min-w-[170px] w-full md:w-auto">
+                        <Link href={`/admin/reports/${report.id}`}>
+                          <button className="px-4 py-2 text-sm rounded-lg font-medium w-full text-left flex justify-between items-center group transition-colors" style={{ backgroundColor: "#e0f7f9", color: "#040f0f" }}>
+                            View Details <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                          </button>
+                        </Link>
+                        {report.status !== 'Resolved' && report.status !== 'Rejected' && (
+                          <div className="flex gap-2">
+                            <button onClick={() => handleReportAction(report.id, 'Resolved')} className="flex-1 py-1.5 px-3 text-[11px] uppercase tracking-wider rounded font-bold bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-200 shadow-sm">
+                              Approve
+                            </button>
+                            <button onClick={() => handleReportAction(report.id, 'Rejected')} className="flex-1 py-1.5 px-3 text-[11px] uppercase tracking-wider rounded font-bold bg-red-50 text-red-700 hover:bg-red-100 transition-colors border border-red-200 shadow-sm">
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
