@@ -16,7 +16,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Navigation, MapPin } from "lucide-react";
 import { OfficialRecord, Report, RiskLevel } from "@/types/types";
 import { MAP_CENTER } from "@/lib/constants";
-import RandomMarkers from "./RandomMarkers";
 
 interface Props {
   records?: OfficialRecord[];
@@ -35,6 +34,18 @@ const getColorForRisk = (risk?: RiskLevel) => {
     case RiskLevel.LOW: return "#22c55e";
     default: return "#94a3b8";
   }
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Roads': '#f97316',
+  'Sanitation': '#eab308',
+  'Public Buildings': '#3b82f6',
+  'Water Supply': '#06b6d4',
+  'Other': '#6b7280',
+};
+
+const getColorForCategory = (category?: string) => {
+  return CATEGORY_COLORS[category || 'Other'] || CATEGORY_COLORS['Other'];
 };
 
 // 1. User Location Icon (Blue Pulse)
@@ -97,13 +108,6 @@ export default function MapVisualizer({
   draftLocation,
 }: Props) {
   
-  // Center Random markers around user, or draft, or default
-  const randomMarkersCenter: [number, number] = draftLocation
-    ? [draftLocation.lat, draftLocation.lng]
-    : userLocation
-    ? [userLocation.lat, userLocation.lng]
-    : [MAP_CENTER.lat, MAP_CENTER.lng];
-
   // Map Focus Priority: Draft Selection > User Location > Default
   const activeCenter = draftLocation || userLocation;
 
@@ -125,9 +129,6 @@ export default function MapVisualizer({
 
         {/* Handles Clicks for selection */}
         <MapClickHandler onMapClick={onMapClick} />
-
-        {/* Random background markers */}
-        <RandomMarkers center={randomMarkersCenter} count={20} />
 
         {/* 1. User Location Marker */}
         {userLocation && (
@@ -154,7 +155,7 @@ export default function MapVisualizer({
           </Marker>
         ))}
 
-        {/* 4. Existing Reports Markers */}
+        {/* 4. Citizen Report Markers (category-colored with risk ring) */}
         {reports.map((report) => (
           <CircleMarker
             key={report.id}
@@ -162,14 +163,35 @@ export default function MapVisualizer({
               report.evidence.coordinates.lat,
               report.evidence.coordinates.lng,
             ]}
-            radius={12}
+            radius={10}
             pathOptions={{
-              color: "white",
-              weight: 2,
-              fillColor: getColorForRisk(report.auditResult?.riskLevel),
-              fillOpacity: 0.8,
+              color: getColorForRisk(report.auditResult?.riskLevel),
+              weight: 3,
+              fillColor: getColorForCategory(report.category),
+              fillOpacity: 0.85,
             }}
-          />
+          >
+            <Popup>
+              <div className="min-w-[180px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColorForCategory(report.category) }} />
+                  <span className="text-xs font-bold text-slate-800">{report.category || 'Other'}</span>
+                </div>
+                {report.auditResult && (
+                  <div className="text-[10px] font-bold px-1.5 py-0.5 rounded inline-block mb-1" style={{
+                    backgroundColor: report.auditResult.riskLevel === RiskLevel.HIGH ? '#fef2f2' : report.auditResult.riskLevel === RiskLevel.MEDIUM ? '#fffbeb' : '#f0fdf4',
+                    color: getColorForRisk(report.auditResult.riskLevel),
+                  }}>
+                    {report.auditResult.riskLevel} Risk
+                  </div>
+                )}
+                {report.evidence.userComment && (
+                  <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{report.evidence.userComment}</p>
+                )}
+                <div className="text-[10px] text-slate-400 mt-1">#{report.id.substring(0, 8)}</div>
+              </div>
+            </Popup>
+          </CircleMarker>
         ))}
       </MapContainer>
     </div>

@@ -59,6 +59,7 @@ export interface Report {
   matchedRecordId?: string; 
   auditResult?: AuditResult;
   status: 'Pending' | 'Audited' | 'Verified';
+  category?: string;
 }
 
 export interface DashboardStats {

@@ -1,7 +1,7 @@
 "use client";
 
 import "@/lib/leaflet";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -9,14 +9,12 @@ import {
   Popup,
   CircleMarker,
   useMap,
-  useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Navigation, MapPin } from "lucide-react";
+import { Navigation } from "lucide-react";
 import { OfficialRecord, Report, RiskLevel } from "@/types/types";
 import { MAP_CENTER } from "@/lib/constants";
-import RandomMarkers from "./RandomMarkers";
 
 type MapTheme = "light" | "dark" | "satellite" | "terrain" | "watercolor";
 type MapOverlay = "none" | "heatmap" | "cluster" | "density";
@@ -63,6 +61,18 @@ const getColorForRisk = (risk?: RiskLevel) => {
   }
 };
 
+const CATEGORY_COLORS: Record<string, string> = {
+  'Roads': '#f97316',
+  'Sanitation': '#eab308',
+  'Public Buildings': '#3b82f6',
+  'Water Supply': '#06b6d4',
+  'Other': '#6b7280',
+};
+
+const getColorForCategory = (category?: string) => {
+  return CATEGORY_COLORS[category || 'Other'] || CATEGORY_COLORS['Other'];
+};
+
 // User Location Icon
 const createUserIcon = () => {
   if (typeof window === "undefined") return L.divIcon({});
@@ -88,7 +98,7 @@ const FlyToController = ({ location }: { location?: { lat: number; lng: number }
   return null;
 };
 
-// Heatmap overlay using circle markers with large radii and low opacity
+// Heatmap overlay — soft gradient edges via concentric layered circles
 const HeatmapOverlay = ({ records, reports }: { records: OfficialRecord[]; reports: Report[] }) => {
   const points: { lat: number; lng: number; intensity: number }[] = [];
 
@@ -105,32 +115,33 @@ const HeatmapOverlay = ({ records, reports }: { records: OfficialRecord[]; repor
     });
   });
 
-  // Generate additional density points around existing ones
-  const densityPoints = [...points];
-  points.forEach((p) => {
-    for (let i = 0; i < 5; i++) {
-      densityPoints.push({
-        lat: p.lat + (Math.random() - 0.5) * 0.02,
-        lng: p.lng + (Math.random() - 0.5) * 0.02,
-        intensity: p.intensity * (0.3 + Math.random() * 0.4),
-      });
-    }
-  });
+  // Soft-edge layers: each point gets 4 concentric rings (large→small, faint→opaque)
+  const layers = [
+    { radiusScale: 1.0, opacityScale: 0.08 },
+    { radiusScale: 0.7, opacityScale: 0.14 },
+    { radiusScale: 0.45, opacityScale: 0.22 },
+    { radiusScale: 0.22, opacityScale: 0.35 },
+  ];
+
+  const getColor = (intensity: number) =>
+    intensity > 0.7 ? "#ef4444" : intensity > 0.4 ? "#f59e0b" : "#22c55e";
 
   return (
     <>
-      {densityPoints.map((point, i) => (
-        <CircleMarker
-          key={`heat-${i}`}
-          center={[point.lat, point.lng]}
-          radius={35 * point.intensity}
-          pathOptions={{
-            color: "transparent",
-            fillColor: point.intensity > 0.7 ? "#ef4444" : point.intensity > 0.4 ? "#f59e0b" : "#22c55e",
-            fillOpacity: 0.25 * point.intensity,
-          }}
-        />
-      ))}
+      {points.map((point, i) =>
+        layers.map((layer, li) => (
+          <CircleMarker
+            key={`heat-${i}-${li}`}
+            center={[point.lat, point.lng]}
+            radius={55 * point.intensity * layer.radiusScale}
+            pathOptions={{
+              color: "transparent",
+              fillColor: getColor(point.intensity),
+              fillOpacity: layer.opacityScale * point.intensity,
+            }}
+          />
+        ))
+      )}
     </>
   );
 };
@@ -186,37 +197,45 @@ const ClusterOverlay = ({ records, reports }: { records: OfficialRecord[]; repor
   );
 };
 
-// Population density overlay (simulated)
-const DensityOverlay = () => {
-  const densityZones = [
-    { lat: 19.076, lng: 72.8777, radius: 50, density: 0.9, label: "High Density" },
-    { lat: 19.0178, lng: 72.8478, radius: 40, density: 0.7, label: "Medium Density" },
-    { lat: 18.944, lng: 72.823, radius: 45, density: 0.8, label: "High Density" },
-    { lat: 19.1136, lng: 72.8697, radius: 35, density: 0.5, label: "Low Density" },
-    { lat: 19.0544, lng: 72.821, radius: 30, density: 0.6, label: "Medium Density" },
+// Population density overlay — built dynamically from report clusters
+const DensityOverlay = ({ records, reports }: { records: OfficialRecord[]; reports: Report[] }) => {
+  // Grid-based density from real data
+  const grid: Record<string, { lat: number; lng: number; count: number }> = {};
+  const allPoints = [
+    ...records.map((r) => ({ lat: r.location.lat, lng: r.location.lng })),
+    ...reports.map((r) => ({ lat: r.evidence.coordinates.lat, lng: r.evidence.coordinates.lng })),
   ];
+  allPoints.forEach((p) => {
+    const key = `${Math.round(p.lat * 30)}:${Math.round(p.lng * 30)}`;
+    if (!grid[key]) grid[key] = { lat: p.lat, lng: p.lng, count: 0 };
+    grid[key].count++;
+  });
+  const maxCount = Math.max(...Object.values(grid).map((g) => g.count), 1);
 
   return (
     <>
-      {densityZones.map((zone, i) => (
-        <CircleMarker
-          key={`density-${i}`}
-          center={[zone.lat, zone.lng]}
-          radius={zone.radius}
-          pathOptions={{
-            color: "transparent",
-            fillColor: zone.density > 0.7 ? "#7c3aed" : zone.density > 0.5 ? "#8b5cf6" : "#a78bfa",
-            fillOpacity: 0.2 + zone.density * 0.15,
-          }}
-        >
-          <Popup>
-            <div className="text-center">
-              <div className="text-sm font-bold" style={{ color: "#040f0f" }}>{zone.label}</div>
-              <div className="text-xs" style={{ color: "#57737a" }}>Density: {Math.round(zone.density * 100)}%</div>
-            </div>
-          </Popup>
-        </CircleMarker>
-      ))}
+      {Object.values(grid).map((zone, i) => {
+        const density = zone.count / maxCount;
+        return (
+          <CircleMarker
+            key={`density-${i}`}
+            center={[zone.lat, zone.lng]}
+            radius={25 + density * 30}
+            pathOptions={{
+              color: "transparent",
+              fillColor: density > 0.7 ? "#7c3aed" : density > 0.4 ? "#8b5cf6" : "#a78bfa",
+              fillOpacity: 0.15 + density * 0.2,
+            }}
+          >
+            <Popup>
+              <div className="text-center">
+                <div className="text-sm font-bold" style={{ color: "#040f0f" }}>{zone.count} report{zone.count > 1 ? 's' : ''}</div>
+                <div className="text-xs" style={{ color: "#57737a" }}>Density: {Math.round(density * 100)}%</div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
     </>
   );
 };
@@ -248,14 +267,6 @@ export default function AdvancedMapVisualizer({
 
         <FlyToController location={flyToLocation || userLocation} />
 
-        {/* Random background markers */}
-        {overlay === "none" && (
-          <RandomMarkers
-            center={userLocation ? [userLocation.lat, userLocation.lng] : [MAP_CENTER.lat, MAP_CENTER.lng]}
-            count={20}
-          />
-        )}
-
         {/* User Location */}
         {userLocation && (
           <Marker position={[userLocation.lat, userLocation.lng]} icon={createUserIcon()}>
@@ -283,20 +294,41 @@ export default function AdvancedMapVisualizer({
           <CircleMarker
             key={report.id}
             center={[report.evidence.coordinates.lat, report.evidence.coordinates.lng]}
-            radius={12}
+            radius={10}
             pathOptions={{
-              color: "white",
-              weight: 2,
-              fillColor: getColorForRisk(report.auditResult?.riskLevel),
-              fillOpacity: 0.8,
+              color: getColorForRisk(report.auditResult?.riskLevel),
+              weight: 3,
+              fillColor: getColorForCategory(report.category),
+              fillOpacity: 0.85,
             }}
-          />
+          >
+            <Popup>
+              <div className="min-w-[180px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColorForCategory(report.category) }} />
+                  <span className="text-xs font-bold text-slate-800">{report.category || 'Other'}</span>
+                </div>
+                {report.auditResult && (
+                  <div className="text-[10px] font-bold px-1.5 py-0.5 rounded inline-block mb-1" style={{
+                    backgroundColor: report.auditResult.riskLevel === RiskLevel.HIGH ? '#fef2f2' : report.auditResult.riskLevel === RiskLevel.MEDIUM ? '#fffbeb' : '#f0fdf4',
+                    color: getColorForRisk(report.auditResult.riskLevel),
+                  }}>
+                    {report.auditResult.riskLevel} Risk
+                  </div>
+                )}
+                {report.evidence.userComment && (
+                  <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{report.evidence.userComment}</p>
+                )}
+                <div className="text-[10px] text-slate-400 mt-1">#{report.id.substring(0, 8)}</div>
+              </div>
+            </Popup>
+          </CircleMarker>
         ))}
 
         {/* Overlay layers */}
         {overlay === "heatmap" && <HeatmapOverlay records={records} reports={reports} />}
         {overlay === "cluster" && <ClusterOverlay records={records} reports={reports} />}
-        {overlay === "density" && <DensityOverlay />}
+        {overlay === "density" && <DensityOverlay records={records} reports={reports} />}
       </MapContainer>
     </div>
   );

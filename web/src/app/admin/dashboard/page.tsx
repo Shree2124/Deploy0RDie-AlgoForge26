@@ -1,14 +1,37 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   AlertTriangle, Settings, Search, CheckCircle2,
   TrendingUp, ShieldAlert, MoreHorizontal, Building2,
-  Map as MapIcon, ChevronRight, ShieldCheck, XCircle
+  Map as MapIcon, ChevronRight, ShieldCheck, XCircle, LocateFixed
 } from "lucide-react";
-import { OfficialRecord, ProjectCategory } from "@/types/types";
+import { OfficialRecord, ProjectCategory, Report, RiskLevel } from "@/types/types";
 import { supabase } from "@/lib/supabase/client";
+
+// --- ERROR BOUNDARY FOR LEAFLET ISSUES ---
+class MapErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: any) { console.error("MapVisualizer Crash:", error); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full w-full flex items-center justify-center bg-gray-50 text-gray-400 rounded-xl border border-dashed border-gray-300">
+          <div className="text-center">
+            <MapIcon className="mx-auto h-8 w-8 mb-2 opacity-50" />
+            <p className="text-sm">Map rendering disabled due to data format error.</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // --- DYNAMIC MAP IMPORT ---
 const MapVisualizer = dynamic(() => import("@/components/MapView/Mapvisualizer"), {
@@ -43,20 +66,24 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
 
   // --- DYNAMIC DATA STATE ---
   const [reports, setReports] = useState<any[]>([]);
+  const [records, setRecords] = useState<OfficialRecord[]>([]);
   const [verifications, setVerifications] = useState<any[]>([]);
   const [rtiRequests, setRtiRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
 
   // Fetch Live Reports & Verifications from Database
   useEffect(() => {
     const fetchData = async () => {
-      const { data: reportsData, error: reportsError } = await supabase
-        .from('citizen_reports')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!reportsError && reportsData) {
-        setReports(reportsData);
+      try {
+        const reportsRes = await fetch('/api/admin/reports');
+        if (reportsRes.ok) {
+          const reportsData = await reportsRes.json();
+          setReports(reportsData);
+        }
+      } catch (e) {
+        console.error('Failed to fetch admin reports:', e);
       }
 
       // Fetch Profiles that have submitted Aadhar
@@ -70,17 +97,73 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
         setVerifications(verifyData);
       }
 
+      // Fetch Official Records
+      try {
+        const recordsRes = await fetch('/api/records');
+        if (recordsRes.ok) {
+          const recordsData = await recordsRes.json();
+          setRecords(recordsData);
+        }
+      } catch (e) {
+        console.error('Failed to fetch records:', e);
+      }
+
       // Fetch RTI Requests
-      const rtiRes = await fetch('/api/get-rti');
-      if (rtiRes.ok) {
-        const rtiData = await rtiRes.json();
-        setRtiRequests(rtiData);
+      try {
+        const rtiRes = await fetch(`/api/get-rti?timestamp=${Date.now()}`, { cache: 'no-store' });
+        if (rtiRes.ok) {
+          const rtiData = await rtiRes.json();
+          console.log("==> RAW RTI DATA FROM API:", rtiData);
+          const finalData = rtiData.data ? rtiData.data : rtiData;
+          if (Array.isArray(finalData)) {
+            setRtiRequests(finalData);
+          } else {
+            console.error("==> Still not an array after fallback!", finalData);
+            setRtiRequests([]);
+          }
+        } else {
+          console.error("==> Fetch failed", rtiRes.status);
+        }
+      } catch (e) {
+        console.error('Failed to fetch RTI requests on the client:', e);
       }
 
       setLoading(false);
     };
     fetchData();
   }, []);
+
+  // --- TRANSFORM DB REPORTS TO MAP Report[] FORMAT ---
+  const mapReports: Report[] = useMemo(() => {
+    return reports
+      .filter((r: any) => r.latitude != null && r.longitude != null)
+      .map((r: any) => {
+        const riskMap: Record<string, RiskLevel> = {
+          'High': RiskLevel.HIGH,
+          'Medium': RiskLevel.MEDIUM,
+          'Low': RiskLevel.LOW,
+        };
+        return {
+          id: r.id,
+          evidence: {
+            image: r.image_url || '',
+            timestamp: new Date(r.created_at).getTime(),
+            coordinates: { lat: r.latitude, lng: r.longitude },
+            userComment: r.notes || undefined,
+          },
+          auditResult: r.ai_risk_level
+            ? {
+              riskLevel: riskMap[r.ai_risk_level] || RiskLevel.UNKNOWN,
+              discrepancies: r.ai_discrepancies || [],
+              reasoning: r.ai_verdict || '',
+              confidenceScore: 0.8,
+            }
+            : undefined,
+          status: r.status === 'Verified' ? 'Verified' as const : r.status === 'Audited' ? 'Audited' as const : 'Pending' as const,
+          category: r.category || 'Other',
+        };
+      });
+  }, [reports]);
 
   // --- DERIVED STATS ---
   const highRiskIssues = reports.filter((r) => r.ai_risk_level === 'High');
@@ -117,6 +200,37 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
     }
   };
 
+  // Handle Report Actions (Approve / Reject)
+  const handleReportAction = async (reportId: string, status: 'Resolved' | 'Rejected') => {
+    let reason = null;
+    if (status === 'Rejected') {
+      reason = prompt("Enter reason for report rejection:");
+      if (!reason) return; // Cancelled
+    }
+
+    try {
+      const res = await fetch(`/api/admin/reports/${reportId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason }),
+      });
+
+      if (res.ok) {
+        alert(`Report successfully marked as ${status}`);
+        setReports(reports.map(r => r.id === reportId ? {
+          ...r,
+          status,
+          notes: reason ? `${r.notes || ''}\n\nAdmin Rejection Reason: ${reason}` : r.notes
+        } : r));
+      } else {
+        alert("Failed to update report status.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error updating report status.");
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto p-4 lg:p-8 scroll-smooth" style={{ backgroundColor: "#f4feff" }}>
       <div className="max-w-7xl mx-auto text-slate-900 font-sans">
@@ -148,19 +262,41 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
             </div>
 
             {/* SPLIT VIEW: MAP & AI INSIGHT */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[350px]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[450px]">
               {/* MAP SECTION */}
               <div className="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden flex flex-col" style={{ border: "1px solid #b0d8db" }}>
                 <div className="px-6 py-3 flex justify-between items-center shrink-0" style={{ backgroundColor: "#e0f7f9", borderBottom: "1px solid #b0d8db" }}>
                   <h3 className="font-bold flex items-center gap-2 text-sm" style={{ color: "#040f0f" }}>
                     <MapIcon size={16} style={{ color: "#57737a" }} /> Live Infrastructure Map
                   </h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1" style={{ color: "#57737a", backgroundColor: "#c9fbff" }}>
-                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#85bdbf" }}></span> Live
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setLocating(true);
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                            setLocating(false);
+                          },
+                          () => setLocating(false),
+                          { enableHighAccuracy: true }
+                        );
+                      }}
+                      className="p-1.5 rounded-full transition-all hover:scale-105"
+                      style={{ backgroundColor: userLocation ? '#dbeafe' : '#e0f7f9', border: '1px solid #b0d8db' }}
+                      title="Show my location"
+                    >
+                      <LocateFixed size={14} className={locating ? 'animate-spin' : ''} style={{ color: userLocation ? '#2563eb' : '#57737a' }} />
+                    </button>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1" style={{ color: "#57737a", backgroundColor: "#c9fbff" }}>
+                      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#85bdbf" }}></span> Live
+                    </span>
+                  </div>
                 </div>
                 <div className="flex-1 relative z-0">
-                  <MapVisualizer records={MOCK_RECORDS} reports={[]} onRecordSelect={() => { }} />
+                  <MapErrorBoundary>
+                    <MapVisualizer records={records} reports={mapReports} onRecordSelect={() => { }} userLocation={userLocation} />
+                  </MapErrorBoundary>
                 </div>
               </div>
 
@@ -216,6 +352,16 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
                         View Details <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
                       </button>
                     </Link>
+                    {report.status !== 'Resolved' && report.status !== 'Rejected' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => handleReportAction(report.id, 'Resolved')} className="flex-1 py-1.5 px-3 text-[11px] uppercase tracking-wider rounded font-bold bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-200 shadow-sm">
+                          Approve
+                        </button>
+                        <button onClick={() => handleReportAction(report.id, 'Rejected')} className="flex-1 py-1.5 px-3 text-[11px] uppercase tracking-wider rounded font-bold bg-red-50 text-red-700 hover:bg-red-100 transition-colors border border-red-200 shadow-sm">
+                          Reject
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))

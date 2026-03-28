@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/dbConnect';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { status } = await request.json();
+  const { status, reason } = await request.json();
 
   if (!id || !status) {
     return NextResponse.json({ error: 'RTI ID and status are required' }, { status: 400 });
@@ -14,9 +14,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   try {
+    let updatePayload: any = { status };
+
+    if (status === 'Rejected' && reason) {
+      const { data: currentRti } = await supabaseAdmin
+        .from('rti_requests')
+        .select('extract_data')
+        .eq('id', id)
+        .single();
+
+      const extractData = currentRti?.extract_data || {};
+      extractData.rejection_reason = reason;
+      updatePayload.extract_data = extractData;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('rti_requests')
-      .update({ status })
+      .update(updatePayload)
       .eq('id', id)
       .select();
 

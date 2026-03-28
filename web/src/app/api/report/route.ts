@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
     const latitude = parseFloat(formData.get('latitude') as string)
     const longitude = parseFloat(formData.get('longitude') as string)
     const description = formData.get('description') as string
+    const category = formData.get('category') as string | null
     const userId = formData.get('userId') as string | null
 
     if (!evidence || isNaN(latitude) || isNaN(longitude)) {
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
         latitude,
         longitude,
         notes: description,
+        category: category || 'Other',
         user_id: userId || null,
         status: 'Pending AI' // Set initial status
       })
