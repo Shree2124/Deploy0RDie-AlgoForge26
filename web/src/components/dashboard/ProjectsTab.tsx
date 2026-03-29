@@ -9,13 +9,14 @@ import {
   Crosshair,
   Trash2,
   Pencil,
-  FolderOpen
+  FolderOpen,
+  LocateFixed
 } from 'lucide-react';
 
 import { ProjectCategory } from '@/types/types';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 
 type LocationMarkerProps = {
   position: [number, number] | null;
@@ -26,6 +27,7 @@ type LocationPickerMapProps = {
   selectedLat: string;
   selectedLng: string;
   onLocationSelect: (lat: number, lng: number) => void;
+  flyTrigger?: number;
 };
 
 type ProjectRow = {
@@ -94,9 +96,18 @@ function LocationMarker({ position, onSelect }: LocationMarkerProps) {
   });
   return position === null ? null : <Marker position={position}></Marker>;
 }
+const FlyToWatcher = ({ position, flyTrigger }: { position: [number, number] | null, flyTrigger?: number }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (position && flyTrigger && flyTrigger > 0) {
+      map.flyTo(position, 16, { animate: true, duration: 1.5 });
+    }
+  }, [position, flyTrigger, map]);
+  return null;
+};
 
 const LocationPickerMap = dynamic(
-  () => Promise.resolve(({ selectedLat, selectedLng, onLocationSelect }: LocationPickerMapProps) => {
+  () => Promise.resolve(({ selectedLat, selectedLng, onLocationSelect, flyTrigger }: LocationPickerMapProps) => {
     const defaultCenter: [number, number] = [19.0760, 72.8777];
     const position: [number, number] | null = selectedLat && selectedLng
       ? [parseFloat(selectedLat), parseFloat(selectedLng)]
@@ -110,10 +121,11 @@ const LocationPickerMap = dynamic(
         className="z-0"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; Google Maps'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
         <LocationMarker position={position} onSelect={onLocationSelect} />
+        <FlyToWatcher position={position} flyTrigger={flyTrigger} />
       </MapContainer>
     );
   }),
@@ -149,6 +161,7 @@ export default function ProjectsTab() {
   const [loadingList, setLoadingList] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectReportFile, setProjectReportFile] = useState<File | null>(null);
+  const [flyTrigger, setFlyTrigger] = useState(0);
 
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
     id: generateProjectId(),
@@ -180,6 +193,22 @@ export default function ProjectsTab() {
       latitude: lat.toFixed(6),
       longitude: lng.toFixed(6),
     }));
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        handleLocationSelect(position.coords.latitude, position.coords.longitude);
+        setFlyTrigger((prev) => prev + 1);
+      },
+      () => {
+        alert("Unable to retrieve your location. Please check browser permissions.");
+      }
+    );
   };
 
   const fetchProjects = useCallback(async () => {
@@ -404,11 +433,22 @@ export default function ProjectsTab() {
           </div>
 
           <div className="p-4 rounded-xl space-y-3" style={{ backgroundColor: "#e0f7f9", border: "1px solid #b0d8db" }}>
-            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "#040f0f" }}>
-              <MapPin size={16} style={{ color: "#57737a" }} /> Project Location
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: "#040f0f" }}>
+                <MapPin size={16} style={{ color: "#57737a" }} /> Project Location
+              </h3>
+              <button
+                type="button"
+                onClick={handleGetCurrentLocation}
+                title="Get Current Location"
+                className="px-2 py-1 rounded-lg transition-colors bg-white hover:bg-[#f4feff] flex items-center gap-1.5 text-xs font-bold shadow-sm"
+                style={{ color: "#57737a", border: "1px solid #b0d8db" }}
+              >
+                <LocateFixed size={14} /> My Location
+              </button>
+            </div>
             <div className="h-56 w-full rounded-lg overflow-hidden shadow-sm relative z-0" style={{ border: "1px solid #b0d8db" }}>
-              <LocationPickerMap selectedLat={selectedLat} selectedLng={selectedLng} onLocationSelect={handleLocationSelect} />
+              <LocationPickerMap selectedLat={selectedLat} selectedLng={selectedLng} onLocationSelect={handleLocationSelect} flyTrigger={flyTrigger} />
               {(!selectedLat || !selectedLng) && (
                 <div className="absolute inset-0 bg-black/10 pointer-events-none flex items-center justify-center">
                   <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm" style={{ color: "#57737a" }}>
