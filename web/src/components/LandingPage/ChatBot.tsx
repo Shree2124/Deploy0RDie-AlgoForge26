@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { GoogleGenerativeAI, ChatSession } from "@google/generative-ai";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare,
@@ -51,7 +50,6 @@ export const ChatBot: React.FC = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const chatSession = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -62,69 +60,41 @@ export const ChatBot: React.FC = () => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  const initChat = async () => {
-    if (chatSession.current) return;
-
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-
-    if (!apiKey) {
-      console.error("API Key is missing! Check .env.local");
-      return;
-    }
-
-    try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      const model = genAI.getGenerativeModel({
-        model: MODEL_NAME,
-      });
-
-      chatSession.current = model.startChat({
-        history: [
-          {
-            role: "user",
-            parts: [{ text: `System Instruction: ${SYSTEM_INSTRUCTION}` }],
-          },
-          {
-            role: "model",
-            parts: [{ text: "Understood. I am Civic Sahayak. I will answer briefly and professionally." }],
-          }
-        ],
-      });
-    } catch (error) {
-      console.error("Failed to initialize AI:", error);
-    }
-  };
-
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     if (!textToSend.trim() || isLoading) return;
 
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", text: textToSend }]);
+    const newMessages = [...messages, { role: "user" as const, text: textToSend }];
+    setMessages(newMessages);
     setIsLoading(true);
 
     try {
-      if (!chatSession.current) {
-        await initChat();
-      }
+      const payloadMessages = [
+        { role: "system", content: SYSTEM_INSTRUCTION },
+        ...newMessages.map(m => ({
+          role: m.role === "model" ? "assistant" : "user",
+          content: m.text
+        }))
+      ];
 
-      if (chatSession.current) {
-        const result = await chatSession.current.sendMessage(textToSend);
-        const response = await result.response;
-        const responseText = response.text();
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: payloadMessages })
+      });
 
-        setMessages((prev) => [...prev, { role: "model", text: responseText }]);
-      } else {
-        throw new Error("Chat session could not be initialized");
-      }
+      if (!res.ok) throw new Error("API request failed");
+      const data = await res.json();
+
+      setMessages((prev) => [...prev, { role: "model", text: data.text }]);
     } catch (error) {
       console.error("Chat Error:", error);
       setMessages((prev) => [
         ...prev,
         {
           role: "model",
-          text: "Connection error. Please check your API Key or try again later.",
+          text: "Connection error. Please try again later.",
         },
       ]);
     } finally {
@@ -133,7 +103,6 @@ export const ChatBot: React.FC = () => {
   };
 
   const handleReset = () => {
-    chatSession.current = null;
     setMessages([
       {
         role: "model",
