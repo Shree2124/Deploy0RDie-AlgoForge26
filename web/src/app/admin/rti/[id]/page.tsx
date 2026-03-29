@@ -69,18 +69,7 @@ export default function AdminRtiReviewPage() {
     }
     setActionLoading(true);
     try {
-      // 1. Handle File Upload
-      let attachmentUrl = null;
-      if (responseFile) {
-        const filePath = `admin-responses/${id}/${Date.now()}-${responseFile.name.replace(/\s/g, '-')}`;
-        const { error: uploadError } = await supabase.storage.from('rti-documents').upload(filePath, responseFile);
-        if (uploadError) throw new Error("Failed to upload the evidence file to storage.");
-
-        const { data } = supabase.storage.from('rti-documents').getPublicUrl(filePath);
-        attachmentUrl = data.publicUrl;
-      }
-
-      // 2. Format the response combining the overall message and individual answers
+      // 1. Format the response combining the overall message and individual answers
       let finalResponseText = responseText;
       if (rtiData.questions && rtiData.questions.length > 0) {
         const qaFormatted = rtiData.questions.map((q: string, i: number) => {
@@ -90,18 +79,24 @@ export default function AdminRtiReviewPage() {
         finalResponseText = `${responseText}\n\n--- Specific Question Responses ---\n${qaFormatted}`;
       }
 
+      // 2. Prepare FormData (Server handles upload now to bypass 400 error)
+      const formData = new FormData();
+      formData.append('status', 'Approved');
+      formData.append('responseText', finalResponseText);
+      if (responseFile) {
+        formData.append('file', responseFile);
+      }
+
       // 3. API Persistence
       const res = await fetch(`/api/update-rti-status/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: 'Approved',
-          responseText: finalResponseText,
-          attachments: attachmentUrl ? [attachmentUrl] : []
-        }),
+        body: formData, // No headers needed, browser sets multipart boundary
       });
 
-      if (!res.ok) throw new Error("Failed to resolve the RTI Request");
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to resolve the RTI Request");
+      }
 
       setAcceptModalOpen(false);
       setSuccess(true);
