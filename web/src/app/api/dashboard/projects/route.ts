@@ -8,18 +8,17 @@ const uploadProjectReport = async (projectId: string, file: File) => {
   const filePath = `${projectId}/${Date.now()}-${safeName}`;
 
   const { error: uploadError } = await supabaseAdmin.storage
-    .from("vendor_reports")
+    .from("project_reports")
     .upload(filePath, file, {
       contentType: file.type || "application/octet-stream",
       upsert: false,
     });
-    console.log(uploadError)
 
   if (uploadError) {
     throw new Error(uploadError.message);
   }
 
-  const { data } = supabaseAdmin.storage.from("vendor_reports").getPublicUrl(filePath);
+  const { data } = supabaseAdmin.storage.from("project_reports").getPublicUrl(filePath);
   return data.publicUrl;
 };
 
@@ -57,6 +56,7 @@ export async function POST(req: NextRequest) {
     let description: string | null = null;
     let department: string | null = null;
     let report: string | null = null;
+    let exctracted_data: string | null = null;
 
     if (isMultipart) {
       const formData = await req.formData();

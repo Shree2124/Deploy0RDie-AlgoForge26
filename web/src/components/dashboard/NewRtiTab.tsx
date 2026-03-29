@@ -190,7 +190,13 @@ export default function NewRtiTab({ onBack }: NewRtiTabProps) {
                 }),
             });
 
-            const data = await response.json();
+            const contentType = response.headers.get("content-type");
+            let data;
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
+            } else {
+                throw new Error("Server returned an invalid format. The AI service may be temporarily down.");
+            }
 
             if (!response.ok) {
                 throw new Error(data.error || "AI service failed. Please check your network or try again.");

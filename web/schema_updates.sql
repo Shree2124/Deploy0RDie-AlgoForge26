@@ -1,7 +1,7 @@
 -- schema_updates.sql
 -- Run these commands in your Supabase SQL Editor to support the new features.
 
--- 1. Ensure the `is_anonymous` column exists in the `rti_requests` table.
+-- 1. Ensure the `is_anonymous` column exists in the `rti_requests` table.      
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'rti_requests' AND column_name = 'is_anonymous') THEN
