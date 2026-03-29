@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/dbConnect";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_: NextRequest, { params }: Params) {
   try {
-    const vendorId = Number(params.id);
+    const { id } = await params;
+    const vendorId = Number(id);
     if (Number.isNaN(vendorId)) {
       return NextResponse.json({ error: "Invalid vendor id" }, { status: 400 });
     }
@@ -29,7 +30,8 @@ export async function GET(_: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const vendorId = Number(params.id);
+    const { id } = await params;
+    const vendorId = Number(id);
     if (Number.isNaN(vendorId)) {
       return NextResponse.json({ error: "Invalid vendor id" }, { status: 400 });
     }
@@ -78,7 +80,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_: NextRequest, { params }: Params) {
   try {
-    const vendorId = Number(params.id);
+    const { id } = await params;
+    const vendorId = Number(id);
     if (Number.isNaN(vendorId)) {
       return NextResponse.json({ error: "Invalid vendor id" }, { status: 400 });
     }

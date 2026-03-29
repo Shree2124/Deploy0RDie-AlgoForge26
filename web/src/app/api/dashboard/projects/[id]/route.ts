@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/dbConnect";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 const uploadProjectReport = async (projectId: string, file: File) => {
   const safeName = file.name.replace(/\s+/g, "-");
@@ -24,7 +24,7 @@ const uploadProjectReport = async (projectId: string, file: File) => {
 
 export async function GET(_: NextRequest, { params }: Params) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { data, error } = await supabaseAdmin
       .from("projects")
       .select("*")
@@ -44,7 +44,7 @@ export async function GET(_: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const updatePayload: Record<string, unknown> = {};
 
     const isMultipart = (req.headers.get("content-type") || "").includes("multipart/form-data");
@@ -114,7 +114,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_: NextRequest, { params }: Params) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { error } = await supabaseAdmin.from("projects").delete().eq("id", id);
 
     if (error) {

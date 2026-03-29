@@ -1,7 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Bell as BellIcon,
   User as UserIcon,
@@ -19,13 +18,15 @@ interface AdminHeaderProps {
   activeTab?: string;
   onExport?: () => void;
   isExporting?: boolean;
+  onTabChange?: (tab: string) => void;
 }
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({ 
   user,
   activeTab = "overview",
   onExport,
-  isExporting = false
+  isExporting = false,
+  onTabChange
 }) => {
   const router = useRouter();
   const { signOut } = useAuth();
@@ -49,6 +50,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
     switch (activeTab) {
       case "overview": return "Overview";
       case "issues": return "Issues & Risk";
+      case "projects": return "Projects";
+      case "vendors": return "Vendors";
       case "verifications": return "Citizen KYC";
       case "rti": return "RTI Requests";
       case "contractors": return "Contractors";
@@ -104,18 +107,18 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
           )}
 
           {/* New Project CTA */}
-          <Link href="/admin/projects/new" aria-label="New Project">
-            <div
-              className="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[14px] font-bold transition-all shadow-sm"
-              style={{
-                backgroundColor: "#040f0f",
-                color: "#c2fcf7",
-              }}
-            >
-              <PlusIcon size={14} />
-              <span className="hidden sm:inline">Project</span>
-            </div>
-          </Link>
+          <button
+            onClick={() => onTabChange?.("projects")}
+            aria-label="New Project"
+            className="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[14px] font-bold transition-all shadow-sm hover:opacity-90"
+            style={{
+              backgroundColor: "#040f0f",
+              color: "#c2fcf7",
+            }}
+          >
+            <PlusIcon size={14} />
+            <span className="hidden sm:inline">Project</span>
+          </button>
 
           {/* Alerts */}
           <div
