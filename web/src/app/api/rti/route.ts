@@ -26,16 +26,16 @@ export async function POST(request: NextRequest) {
     // 2. Handle file upload securely
     let documentUrl: string | null = null;
     if (file) {
-      const filePath = `rti-documents/${userId || 'public'}/${Date.now()}-${file.name.replace(/\s/g, '-')}`;
+      const filePath = `${userId || 'public'}/${Date.now()}-${file.name.replace(/\s/g, '-')}`;
       const { error: uploadError } = await supabaseAdmin.storage
-        .from('rti-files')
+        .from('rti-documents')
         .upload(filePath, file);
 
       if (uploadError) {
         console.error('File upload error:', uploadError);
         return NextResponse.json({ error: 'Failed to upload document' }, { status: 500 });
       }
-      const { data } = supabaseAdmin.storage.from('rti-files').getPublicUrl(filePath);
+      const { data } = supabaseAdmin.storage.from('rti-documents').getPublicUrl(filePath);
       documentUrl = data.publicUrl;
     }
 

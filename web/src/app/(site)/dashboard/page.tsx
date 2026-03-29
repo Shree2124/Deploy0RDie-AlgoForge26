@@ -102,7 +102,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
     if (!user) return;
     const { data, error } = await supabase
       .from('rti_requests')
-      .select('*')
+      .select('*, rti_response(*)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -153,10 +153,10 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const p = 0.017453292519943295;
     const c = Math.cos;
-    const a = 0.5 - c((lat2 - lat1) * p)/2 + 
-              c(lat1 * p) * c(lat2 * p) * 
-              (1 - c((lon2 - lon1) * p))/2;
-    return 12742 * Math.asin(Math.sqrt(a)); 
+    const a = 0.5 - c((lat2 - lat1) * p) / 2 +
+      c(lat1 * p) * c(lat2 * p) *
+      (1 - c((lon2 - lon1) * p)) / 2;
+    return 12742 * Math.asin(Math.sqrt(a));
   };
 
   const nearbyProjects = useMemo(() => {
@@ -674,7 +674,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                           <p className="text-xs truncate capitalize" style={{ color: '#57737a' }}>{item.category || 'General'}</p>
                         </div>
                         <span className="text-xs font-bold whitespace-nowrap" style={{ color: '#85bdbf' }}>
-                           ₹{((item.budget || 0) / 10000000).toFixed(2)} Cr
+                          ₹{((item.budget || 0) / 10000000).toFixed(2)} Cr
                         </span>
                       </div>
                     )) : (
@@ -855,49 +855,68 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                 ) : myRtiRequests.length === 0 ? (
                   <p style={{ color: '#85bdbf' }}>No RTI requests filed yet.</p>
                 ) : (
-                  myRtiRequests.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="p-6 rounded-2xl transition-all group hover:shadow-lg hover:-translate-y-0.5"
-                      style={{ backgroundColor: '#ffffff', border: '1px solid #b0d8db' }}
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 rounded-xl" style={{ backgroundColor: '#e0f7f9' }}>
-                          <FileText size={24} style={{ color: '#57737a' }} />
+                  myRtiRequests.map((doc) => {
+                    const response = doc.rti_response && doc.rti_response.length > 0 ? doc.rti_response[0] : null;
+                    return (
+                      <div
+                        key={doc.id}
+                        className="p-6 rounded-2xl transition-all group hover:shadow-lg hover:-translate-y-0.5"
+                        style={{ backgroundColor: '#ffffff', border: '1px solid #b0d8db' }}
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: '#e0f7f9' }}>
+                            <FileText size={24} style={{ color: '#57737a' }} />
+                          </div>
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${doc.status === 'Approved' ? 'bg-green-100 text-green-700' : doc.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}
+                          >
+                            {doc.status}
+                          </span>
                         </div>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${doc.status === 'Approved' ? 'bg-green-100 text-green-700' : doc.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}
-                        >
-                          {doc.status}
-                        </span>
+                        <h3 className="text-lg font-bold mb-1 truncate" style={{ color: '#040f0f' }}>{doc.title}</h3>
+
+                        {doc.status === 'Rejected' && response?.rejection_reason && (
+                          <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-800 flex items-start gap-2">
+                            <AlertTriangle size={16} className="shrink-0 mt-0.5 text-red-600" />
+                            <div><strong className="block mb-0.5">Admin Rejection Context:</strong>{response.rejection_reason}</div>
+                          </div>
+                        )}
+
+                        {doc.status === 'Approved' && response?.response_text && (
+                          <div className="mb-4 p-4 rounded-xl bg-green-50 text-sm flex items-start gap-3 border border-green-100">
+                            <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-green-600" />
+                            <div className="w-full">
+                              <strong className="block mb-2 text-green-800">Official Resolution Response:</strong>
+                              <div className="whitespace-pre-wrap text-[#57737a] leading-relaxed">
+                                {response.response_text}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-xs font-mono mb-4" style={{ color: '#57737a' }}>{doc.department}</p>
+                        <p className="text-xs font-mono mb-4" style={{ color: '#85bdbf' }}>
+                          ID: {doc.id} • {new Date(doc.created_at).toLocaleDateString()}
+                        </p>
+
+                        {/* Fallback for old extract_data URL and New response attachments */}
+                        {(doc.extract_data?.document_url || (response?.attachments && response.attachments.length > 0)) && (
+                          <a
+                            href={doc.extract_data?.document_url || response.attachments[0]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-2 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 hover:bg-[#f4feff]"
+                            style={{
+                              border: '1px solid #b0d8db',
+                              color: '#57737a',
+                            }}
+                          >
+                            <Download size={16} /> Download Official Attachment
+                          </a>
+                        )}
                       </div>
-                      <h3 className="text-lg font-bold mb-1 truncate" style={{ color: '#040f0f' }}>{doc.title}</h3>
-                      {doc.status === 'Rejected' && doc.extract_data?.rejection_reason && (
-                        <div className="mb-3 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-800 flex items-start gap-2">
-                          <AlertTriangle size={16} className="shrink-0 mt-0.5 text-red-600" />
-                          <div><strong className="block mb-0.5">Admin Rejection Reason:</strong>{doc.extract_data.rejection_reason}</div>
-                        </div>
-                      )}
-                      <p className="text-xs font-mono mb-4" style={{ color: '#57737a' }}>{doc.department}</p>
-                      <p className="text-xs font-mono mb-4" style={{ color: '#85bdbf' }}>
-                        ID: {doc.id} • {new Date(doc.created_at).toLocaleDateString()}
-                      </p>
-                      {doc.extract_data?.document_url && (
-                        <a
-                          href={doc.extract_data.document_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-2 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 hover:bg-[#f4feff]"
-                          style={{
-                            border: '1px solid #b0d8db',
-                            color: '#57737a',
-                          }}
-                        >
-                          <Download size={16} /> Download Document
-                        </a>
-                      )}
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </motion.div>
