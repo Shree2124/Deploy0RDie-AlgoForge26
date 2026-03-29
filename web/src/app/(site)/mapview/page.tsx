@@ -258,7 +258,7 @@ export default function MapPage() {
         {/* Locate Me Button */}
         <button
           onClick={handleLocateMe}
-          className="absolute bottom-6 right-6 z-[500] w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all hover:shadow-xl hover:scale-105 active:scale-95"
+          className="absolute bottom-44 right-6 z-[500] w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all hover:shadow-xl hover:scale-105 active:scale-95"
           style={{
             backgroundColor: "#ffffff",
             border: "2px solid #b0d8db",

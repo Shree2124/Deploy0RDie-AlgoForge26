@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2, Building2, HelpCircle, User, Paperclip, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2, Building2, HelpCircle, User, Paperclip, X, AlertTriangle, ShieldCheck, ShieldAlert, Target } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 export default function AdminRtiReviewPage() {
@@ -179,6 +179,100 @@ export default function AdminRtiReviewPage() {
                       </div>
                     </div>
 
+                    {/* AI Analysis Result Section */}
+                    {rtiData?.ai_details && (
+                      <div className="rounded-2xl border-2 overflow-hidden bg-white" style={{ borderColor: rtiData.ai_details.ai_risk_level === 'Low' ? '#dcfce7' : rtiData.ai_details.ai_risk_level === 'Medium' ? '#fef9c3' : '#fee2e2' }}>
+                        <div className="px-5 py-3 flex items-center justify-between border-b" style={{ backgroundColor: rtiData.ai_details.ai_risk_level === 'Low' ? '#f0fdf4' : rtiData.ai_details.ai_risk_level === 'Medium' ? '#fefce8' : '#fef2f2', borderColor: 'inherit' }}>
+                          <div className="flex items-center gap-2">
+                            <Target size={18} className={rtiData.ai_details.ai_risk_level === 'Low' ? 'text-green-600' : rtiData.ai_details.ai_risk_level === 'Medium' ? 'text-yellow-600' : 'text-red-600'} />
+                            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#040f0f' }}>AI Insight Engine Analysis</h2>
+                          </div>
+                          <div className={`px-3 py-1 rounded-full text-xs font-black uppercase flex items-center gap-1.5 ${rtiData.ai_details.ai_risk_level === 'Low' ? 'bg-green-100 text-green-700' :
+                              rtiData.ai_details.ai_risk_level === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                            }`}>
+                            {rtiData.ai_details.ai_risk_level === 'Low' ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
+                            Risk: {rtiData.ai_details.ai_risk_level}
+                          </div>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                          {/* AI Verdict */}
+                          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 italic text-sm text-slate-700 leading-relaxed">
+                            “{rtiData.ai_details.ai_verdict}”
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Discrepancies */}
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-slate-500 mb-2 tracking-widest pl-1">Identified Discrepancies</p>
+                              <div className="space-y-1.5">
+                                {rtiData.ai_details.ai_discrepancies && rtiData.ai_details.ai_discrepancies.length > 0 ? (
+                                  rtiData.ai_details.ai_discrepancies.map((d: string, idx: number) => (
+                                    <div key={idx} className="flex items-start gap-2 text-xs font-medium text-slate-600 p-2 rounded-lg bg-red-50/50">
+                                      <AlertTriangle size={12} className="text-red-500 mt-0.5 flex-shrink-0" />
+                                      {d}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-xs text-green-600 font-medium p-2 rounded-lg bg-green-50/50 flex items-center gap-2">
+                                    <ShieldCheck size={12} /> No anomalies detected by AI logic.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Computer Vision Detections */}
+                            <div className="overflow-hidden">
+                              <p className="text-[10px] font-black uppercase text-slate-500 mb-2 tracking-widest pl-1">Computer Vision: Objects Identified</p>
+                              <div className="flex flex-wrap gap-2 w-full">
+                                {(() => {
+                                  let detectionData = rtiData.ai_details.ai_detection;
+
+                                  if (typeof detectionData === 'string') {
+                                    try {
+                                      detectionData = JSON.parse(detectionData);
+                                    } catch (e) {
+                                      return <div className="text-[10px] text-slate-600 w-full break-words">{detectionData}</div>;
+                                    }
+                                  }
+
+                                  if (!detectionData || (Array.isArray(detectionData) && detectionData.length === 0) || (typeof detectionData === 'object' && Object.keys(detectionData).length === 0)) {
+                                    return <div className="text-[10px] text-slate-400 italic">No object detection data available for this request.</div>;
+                                  }
+
+                                  if (Array.isArray(detectionData) && detectionData.length > 0 && typeof detectionData[0] === 'object' && ('label' in detectionData[0] || 'class_name' in detectionData[0])) {
+                                    return detectionData.map((det: any, idx: number) => (
+                                      <div key={idx} className="px-2 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-md text-[10px] font-bold flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                        {det.label || det.class_name || 'Unknown'} {det.confidence ? `(${det.confidence}%)` : ''}
+                                      </div>
+                                    ));
+                                  }
+
+                                  return (
+                                    <pre className="text-[10px] w-full max-w-full overflow-x-auto bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700 font-mono whitespace-pre-wrap break-words">
+                                      {JSON.stringify(detectionData, null, 2)}
+                                    </pre>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+
+                          {rtiData.ai_details.ai_fake && (
+                            <div className="mt-2 p-3 rounded-lg bg-orange-50 border border-orange-100 flex items-center gap-3">
+                              <div className="p-1.5 bg-orange-200 rounded-lg text-orange-700"><AlertTriangle size={16} /></div>
+                              <div>
+                                <p className="text-xs font-bold text-orange-800">High Risk of Location Mismatch</p>
+                                <p className="text-[10px] text-orange-600">The AI detection engine flags this as potentially unrelated to the specified project boundary.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <div className="text-xs uppercase font-bold mb-2 pl-1" style={{ color: '#57737a' }}>Subject line</div>
                       <div className="w-full p-4 rounded-xl font-bold bg-white" style={{ border: '1px solid #b0d8db', color: '#040f0f' }}>
@@ -208,70 +302,60 @@ export default function AdminRtiReviewPage() {
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* Resolution Summary for Processed Requests */}
-                    {rtiData.status !== 'Pending Review' && rtiData.rti_response && rtiData.rti_response.length > 0 && (
-                      <div className={`p-6 rounded-2xl border ${rtiData.status === 'Approved' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                        <div className="flex items-center gap-2 mb-3">
-                          {rtiData.status === 'Approved' ? <CheckCircle2 className="text-green-600" size={20} /> : <XCircle className="text-red-600" size={20} />}
-                          <h3 className="font-bold text-lg" style={{ color: '#040f0f' }}>Official Resolution Summary</h3>
-                        </div>
-
-                        {rtiData.status === 'Approved' ? (
-                          <div className="space-y-4">
-                            <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: '#57737a' }}>
-                              {rtiData.rti_response[0].response_text}
-                            </div>
-                            {rtiData.rti_response[0].attachments && rtiData.rti_response[0].attachments.length > 0 && (
-                              <div className="pt-3 border-t border-green-200">
-                                <a
-                                  href={rtiData.rti_response[0].attachments[0]}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sm font-bold text-green-700 flex items-center gap-2 hover:underline"
-                                >
-                                  <Paperclip size={16} /> View Resolution Attachment
-                                </a>
+                            {rtiData.status === 'Approved' ? (
+                              <div className="space-y-4">
+                                <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: '#57737a' }}>
+                                  {rtiData.rti_response[0].response_text}
+                                </div>
+                                {rtiData.rti_response[0].attachments && rtiData.rti_response[0].attachments.length > 0 && (
+                                  <div className="pt-3 border-t border-green-200">
+                                    <a
+                                      href={rtiData.rti_response[0].attachments[0]}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm font-bold text-green-700 flex items-center gap-2 hover:underline"
+                                    >
+                                      <Paperclip size={16} /> View Resolution Attachment
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-sm italic" style={{ color: '#854d4d' }}>
+                                <strong>Rejection Reason:</strong> {rtiData?.rti_response[0]?.rejection_reason}
                               </div>
                             )}
                           </div>
-                        ) : (
-                          <div className="text-sm italic" style={{ color: '#854d4d' }}>
-                            <strong>Rejection Reason:</strong> {rtiData.rti_response[0].rejection_reason}
-                          </div>
                         )}
+
+                        {/* Action Panel */}
+                        <div className="pt-6 mt-6 flex flex-col sm:flex-row gap-3 justify-end" style={{ borderTop: '1px solid #e0f7f9' }}>
+                          <button
+                            onClick={() => setRejectModalOpen(true)}
+                            disabled={actionLoading}
+                            className="px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            <XCircle size={18} /> Reject
+                          </button>
+                          <button
+                            onClick={() => handleAction('Pending')}
+                            disabled={actionLoading}
+                            className="px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 disabled:opacity-50"
+                          >
+                            <Clock size={18} /> Wait / Review
+                          </button>
+                          <button
+                            onClick={() => setAcceptModalOpen(true)}
+                            disabled={actionLoading}
+                            className="px-8 py-3 font-bold rounded-xl text-white transition-all flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 shadow-md disabled:opacity-50"
+                          >
+                            {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> Review & Accept</>}
+                          </button>
+                        </div>
+
                       </div>
-                    )}
-
-                    {/* Action Panel */}
-                    <div className="pt-6 mt-6 flex flex-col sm:flex-row gap-3 justify-end" style={{ borderTop: '1px solid #e0f7f9' }}>
-                      <button
-                        onClick={() => setRejectModalOpen(true)}
-                        disabled={actionLoading}
-                        className="px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
-                      >
-                        <XCircle size={18} /> Reject
-                      </button>
-                      <button
-                        onClick={() => handleAction('Pending')}
-                        disabled={actionLoading}
-                        className="px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 disabled:opacity-50"
-                      >
-                        <Clock size={18} /> Wait / Review
-                      </button>
-                      <button
-                        onClick={() => setAcceptModalOpen(true)}
-                        disabled={actionLoading}
-                        className="px-8 py-3 font-bold rounded-xl text-white transition-all flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 shadow-md disabled:opacity-50"
-                      >
-                        {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> Review & Accept</>}
-                      </button>
                     </div>
-
                   </div>
                 )}
               </div>
