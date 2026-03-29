@@ -113,7 +113,7 @@ An autonomous, non-blocking multi-agent AI pipeline:
    npm run dev
    ```
 
-5. Open `http://localhost:3000` in your browser to see the application.
+5. Open `https://deployordie-algo-forge26.vercel.app/` or `https://localhost:3000` in your browser to see the application.
 
 ## Team: Deploy0RDie
 - Aayush Shinde
