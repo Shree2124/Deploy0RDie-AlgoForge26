@@ -90,4 +90,3 @@ An autonomous, non-blocking multi-agent AI pipeline:
    ```bash
    git clone [https://github.com/your-org/civic-ai.git](https://github.com/your-org/civic-ai.git)
    cd civic-ai
-   cd civic-ai
