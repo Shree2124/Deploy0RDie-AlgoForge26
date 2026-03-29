@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (documentUrl) insertData.extract_data = { document_url: documentUrl };
 
     // Only add optional new-schema fields if they exist in the payload
-    if (!is_anonymous && userId) insertData.user_id = userId;
+    if (userId) insertData.user_id = userId;
     if (is_anonymous) insertData.is_anonymous = true;
     if (location_address) insertData.location_address = location_address;
 
