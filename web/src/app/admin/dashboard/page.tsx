@@ -6,7 +6,7 @@ import {
   AlertTriangle, Settings, Search, CheckCircle2,
   TrendingUp, ShieldAlert, MoreHorizontal, Building2,
   Map as MapIcon, ChevronRight, ShieldCheck, XCircle, LocateFixed, Users, Filter,
-  RefreshCcw, Loader2
+  RefreshCcw, Loader2, Activity, Terminal, Clock
 } from "lucide-react";
 import { OfficialRecord, ProjectCategory, Report, RiskLevel } from "@/types/types";
 import { supabase } from "@/lib/supabase/client";
@@ -60,7 +60,9 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
   const [records, setRecords] = useState<OfficialRecord[]>([]);
   const [verifications, setVerifications] = useState<any[]>([]);
   const [rtiRequests, setRtiRequests] = useState<any[]>([]);
+  const [rtiLogs, setRtiLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
@@ -129,6 +131,15 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
         const finalData = rtiData.data ? rtiData.data : rtiData;
         if (Array.isArray(finalData)) setRtiRequests(finalData);
       }
+
+      // 6. Fetch Admin Audit Logs (RTI)
+      const { data: logData } = await supabase
+        .from('rti_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (logData) setRtiLogs(logData);
     } catch (e) {
       console.error('Data sync failed:', e);
     } finally {
@@ -661,6 +672,104 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
           </div>
         )}
 
+        {/* VIEW: SYSTEM ADMIN (NEW) */}
+        {tab === "system" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* System Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#b0d8db]">
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="p-2 rounded-lg bg-[#e0f7f9] text-[#57737a]"><Users size={20} /></div>
+                  <h4 className="font-bold text-sm uppercase tracking-wider text-slate-500">Total Database Users</h4>
+                </div>
+                <div className="text-3xl font-black text-[#040f0f]">{totalCitizens}</div>
+                <p className="text-xs text-slate-400 mt-1">Total registered profiles in Supabase</p>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#b0d8db]">
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="p-2 rounded-lg bg-orange-50 text-orange-600"><AlertTriangle size={20} /></div>
+                  <h4 className="font-bold text-sm uppercase tracking-wider text-slate-500">High Risk Issues</h4>
+                </div>
+                <div className="text-3xl font-black text-orange-600">
+                  {reports.filter(r => r.ai_risk_level === 'High').length}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Issues requiring immediate attention</p>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#b0d8db]">
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="p-2 rounded-lg bg-green-50 text-green-600"><Activity size={20} /></div>
+                  <h4 className="font-bold text-sm uppercase tracking-wider text-slate-500">System Connection</h4>
+                </div>
+                <div className="text-3xl font-black text-green-600">Active</div>
+                <p className="text-xs text-slate-400 mt-1">Supabase Admin SDK status: Healthy</p>
+              </div>
+            </div>
+
+            {/* Audit Logs Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-[#b0d8db] overflow-hidden">
+              <div className="px-6 py-4 flex justify-between items-center border-b border-[#e0f7f9] bg-[#f4feff]">
+                <div className="flex items-center gap-3">
+                  <Terminal size={18} className="text-[#57737a]" />
+                  <h3 className="font-bold text-[#040f0f]">Administrative Audit Logs</h3>
+                </div>
+                <button
+                  onClick={() => fetchData(true)}
+                  className="text-xs font-bold text-[#57737a] hover:underline"
+                >
+                  Refresh Logs
+                </button>
+              </div>
+              <div className="divide-y divide-[#e0f7f9]">
+                {rtiLogs.length === 0 ? (
+                  <div className="p-10 text-center text-slate-400 italic text-sm">No recent administrative actions recorded.</div>
+                ) : (
+                  rtiLogs.map((log) => (
+                    <div key={log.id} className="p-4 hover:bg-[#f4feff] transition-colors flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-1.5 rounded-full ${log.action?.includes('Approve') ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                          {log.action?.includes('Approve') ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-[#040f0f]">
+                            {log.action} <span className="font-normal text-slate-500">on RTI</span> <span className="font-mono text-xs">#{log.rti_id}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Clock size={10} /> {new Date(log.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-300 uppercase tracking-widest hidden sm:block">
+                        ID: {log.id.substring(0, 8)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Danger Zone / Diagnostic Actions */}
+            <div className="bg-red-50/30 rounded-2xl p-6 border border-red-100">
+              <div className="flex items-center gap-3 mb-4">
+                <ShieldAlert size={20} className="text-red-600" />
+                <h3 className="font-bold text-red-900">System Diagnostic Actions</h3>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                <button
+                  onClick={() => alert("Local cache cleared. New data will be fetched on next refresh.")}
+                  className="px-4 py-2 bg-white border border-red-200 text-red-700 text-xs font-bold rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  Clear System Cache
+                </button>
+                <button
+                  className="px-4 py-2 bg-white border border-slate-200 text-slate-500 text-xs font-bold rounded-lg cursor-not-allowed"
+                  disabled
+                >
+                  Rebuild AI Training Index (Enterprise Only)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

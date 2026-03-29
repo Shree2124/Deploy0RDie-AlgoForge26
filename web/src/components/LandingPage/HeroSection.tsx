@@ -100,7 +100,7 @@ export const HeroSection = () => {
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Button
                   onClick={() => {
-                    router.push("/reportissue");
+                    router.push("/login");
                   }}
                   size="lg"
                   className="text-white shadow-lg h-12 px-8 text-base group"
