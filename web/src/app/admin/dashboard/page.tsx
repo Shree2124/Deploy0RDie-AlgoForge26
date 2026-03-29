@@ -1,11 +1,12 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   AlertTriangle, Settings, Search, CheckCircle2,
   TrendingUp, ShieldAlert, MoreHorizontal, Building2,
-  Map as MapIcon, ChevronRight, ShieldCheck, XCircle, LocateFixed, Users, Filter
+  Map as MapIcon, ChevronRight, ShieldCheck, XCircle, LocateFixed, Users, Filter,
+  RefreshCcw, Loader2
 } from "lucide-react";
 import { OfficialRecord, ProjectCategory, Report, RiskLevel } from "@/types/types";
 import { supabase } from "@/lib/supabase/client";
@@ -60,6 +61,7 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
   const [verifications, setVerifications] = useState<any[]>([]);
   const [rtiRequests, setRtiRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
 
@@ -81,17 +83,16 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
     return "No details provided.";
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = useCallback(async (isManual = false) => {
+    if (isManual) setRefreshing(true);
+    else setLoading(true);
+
+    try {
       // 1. Fetch Admin Reports
-      try {
-        const reportsRes = await fetch('/api/admin/reports');
-        if (reportsRes.ok) {
-          const reportsData = await reportsRes.json();
-          setReports(reportsData);
-        }
-      } catch (e) {
-        console.error('Failed to fetch admin reports:', e);
+      const reportsRes = await fetch('/api/admin/reports');
+      if (reportsRes.ok) {
+        const reportsData = await reportsRes.json();
+        setReports(reportsData);
       }
 
       // 2. Fetch KYC Verifications
@@ -115,32 +116,30 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
       }
 
       // 4. Fetch Official Records
-      try {
-        const recordsRes = await fetch('/api/records');
-        if (recordsRes.ok) {
-          const recordsData = await recordsRes.json();
-          setRecords(recordsData);
-        }
-      } catch (e) {
-        console.error('Failed to fetch records:', e);
+      const recordsRes = await fetch('/api/records');
+      if (recordsRes.ok) {
+        const recordsData = await recordsRes.json();
+        setRecords(recordsData);
       }
 
       // 5. Fetch RTI Requests
-      try {
-        const rtiRes = await fetch(`/api/get-rti?timestamp=${Date.now()}`, { cache: 'no-store' });
-        if (rtiRes.ok) {
-          const rtiData = await rtiRes.json();
-          const finalData = rtiData.data ? rtiData.data : rtiData;
-          if (Array.isArray(finalData)) setRtiRequests(finalData);
-        }
-      } catch (e) {
-        console.error('Failed to fetch RTI requests:', e);
+      const rtiRes = await fetch(`/api/get-rti?timestamp=${Date.now()}`, { cache: 'no-store' });
+      if (rtiRes.ok) {
+        const rtiData = await rtiRes.json();
+        const finalData = rtiData.data ? rtiData.data : rtiData;
+        if (Array.isArray(finalData)) setRtiRequests(finalData);
       }
-
+    } catch (e) {
+      console.error('Data sync failed:', e);
+    } finally {
       setLoading(false);
-    };
-    fetchData();
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const mapReports: Report[] = useMemo(() => {
     return reports
@@ -418,16 +417,27 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Added Search and Filter Bar */}
             <div className="bg-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center" style={{ border: "1px solid #b0d8db" }}>
-              <div className="relative w-full sm:w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={16} style={{ color: "#57737a" }} />
-                <input
-                  type="text"
-                  placeholder="Search by Category or ID..."
-                  value={issueSearchTerm}
-                  onChange={(e) => setIssueSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm rounded-lg outline-none focus:ring-2"
-                  style={{ backgroundColor: "#f4feff", border: "1px solid #b0d8db", color: "#040f0f", '--tw-ring-color': '#85bdbf' } as any}
-                />
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <div className="relative w-full sm:w-80">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={16} style={{ color: "#57737a" }} />
+                  <input
+                    type="text"
+                    placeholder="Search by Category or ID..."
+                    value={issueSearchTerm}
+                    onChange={(e) => setIssueSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-sm rounded-lg outline-none focus:ring-2"
+                    style={{ backgroundColor: "#f4feff", border: "1px solid #b0d8db", color: "#040f0f", '--tw-ring-color': '#85bdbf' } as any}
+                  />
+                </div>
+                <button
+                  onClick={() => fetchData(true)}
+                  disabled={refreshing}
+                  className="p-2 rounded-lg transition-all hover:bg-[#e0f7f9] text-[#57737a] border border-[#b0d8db] flex items-center gap-2 text-sm font-bold"
+                  title="Refresh Data"
+                >
+                  {refreshing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Filter size={16} style={{ color: "#57737a" }} />
@@ -604,7 +614,18 @@ export default function AdminDashboardPage({ activeTab = "overview" }: { activeT
         {tab === "rti" && (
           <div className="bg-white rounded-xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ border: "1px solid #b0d8db" }}>
             <div className="px-6 py-4 flex justify-between items-center" style={{ backgroundColor: "#e0f7f9", borderBottom: "1px solid #b0d8db" }}>
-              <h3 className="font-bold" style={{ color: "#040f0f" }}>RTI Drafts & Requests</h3>
+              <div className="flex items-center gap-4">
+                <h3 className="font-bold" style={{ color: "#040f0f" }}>RTI Drafts & Requests</h3>
+                <button
+                  onClick={() => fetchData(true)}
+                  disabled={refreshing}
+                  className="p-1.5 rounded-md transition-all hover:bg-white/50 text-[#57737a] border border-[#b0d8db]/30 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
+                  title="Refresh RTI Data"
+                >
+                  {refreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />}
+                  Sync
+                </button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-2 top-1.5" size={14} style={{ color: "#57737a" }} />
                 <input type="text" placeholder="Search RTI..." className="pl-7 pr-3 py-1 text-sm bg-white rounded-md focus:outline-none" style={{ border: "1px solid #b0d8db", color: "#040f0f" }} />
