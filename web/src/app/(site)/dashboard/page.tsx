@@ -63,7 +63,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
   const [loadingReports, setLoadingReports] = useState(true);
   const [myRtiRequests, setMyRtiRequests] = useState<any[]>([]);
   const [loadingRti, setLoadingRti] = useState(true);
-  const [records, setRecords] = useState<OfficialRecord[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [allReports, setAllReports] = useState<any[]>([]);
   const [locating, setLocating] = useState(false);
 
@@ -143,12 +143,38 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
         if (!error && data) setAllReports(data);
       });
 
-    // Fetch Official Records from API
-    fetch('/api/records')
-      .then(res => res.ok ? res.json() : [])
-      .then(data => setRecords(data))
+    // Fetch Projects from API
+    fetch('/api/dashboard/projects')
+      .then(res => res.ok ? res.json() : { projects: [] })
+      .then(data => setProjects(data.projects || []))
       .catch(() => { });
   }, [user]);
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const p = 0.017453292519943295;
+    const c = Math.cos;
+    const a = 0.5 - c((lat2 - lat1) * p)/2 + 
+              c(lat1 * p) * c(lat2 * p) * 
+              (1 - c((lon2 - lon1) * p))/2;
+    return 12742 * Math.asin(Math.sqrt(a)); 
+  };
+
+  const nearbyProjects = useMemo(() => {
+    if (!projects.length) return [];
+    const centerLat = userLocation ? userLocation.lat : 19.0760;
+    const centerLng = userLocation ? userLocation.lng : 72.8777;
+    return projects
+      .filter((p: any) => p.latitude && p.longitude)
+      .filter((p: any) => calculateDistance(centerLat, centerLng, p.latitude, p.longitude) <= 15)
+      .sort((a, b) => calculateDistance(centerLat, centerLng, a.latitude, a.longitude) - calculateDistance(centerLat, centerLng, b.latitude, b.longitude));
+  }, [projects, userLocation]);
+
+  const topProjects = useMemo(() => {
+    return [...projects]
+      .filter(p => p.budget)
+      .sort((a: any, b: any) => b.budget - a.budget)
+      .slice(0, 5);
+  }, [projects]);
 
   // --- TRANSFORM ALL REPORTS TO MAP Report[] FORMAT (shows everyone's reports) ---
   const mapReports: Report[] = useMemo(() => {
@@ -218,6 +244,15 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
     }
   };
 
+  const totalBudget = useMemo(() => projects.reduce((acc, p) => acc + (p.budget || 0), 0), [projects]);
+  const completedProjects = useMemo(() => projects.filter(p => p.status === 'Completed').length, [projects]);
+  const complianceRate = projects.length > 0 ? Math.round((completedProjects / projects.length) * 100) : 0;
+  const nearbyAlerts = useMemo(() => {
+    const centerLat = userLocation ? userLocation.lat : 19.0760;
+    const centerLng = userLocation ? userLocation.lng : 72.8777;
+    return mapReports.filter((r: any) => calculateDistance(centerLat, centerLng, r.evidence.coordinates.lat, r.evidence.coordinates.lng) <= 10).length;
+  }, [mapReports, userLocation]);
+
   // Stats data
   const stats = [
     {
@@ -232,29 +267,29 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
     },
     {
       label: "Alerts Near Me",
-      value: "3",
+      value: nearbyAlerts.toString(),
       icon: AlertTriangle,
-      trend: "Active",
+      trend: "within 10km",
       trendUp: false,
       bgColor: "#ffffff",
       textColor: "#040f0f",
       iconColor: "#f59e0b",
     },
     {
-      label: "Compliance Rate",
-      value: "87%",
+      label: "Completion Rate",
+      value: `${complianceRate}%`,
       icon: ShieldCheck,
-      trend: "+5%",
+      trend: "status",
       trendUp: true,
       bgColor: "#ffffff",
       textColor: "#040f0f",
       iconColor: "#85bdbf",
     },
     {
-      label: "Budget Tracked",
-      value: "₹5.7 Cr",
+      label: "Total Budget Tracked",
+      value: `₹${(totalBudget / 10000000).toFixed(2)} Cr`,
       icon: BarChart3,
-      trend: "₹2.3 Cr verified",
+      trend: "tracked live",
       trendUp: true,
       bgColor: "#ffffff",
       textColor: "#040f0f",
@@ -262,12 +297,19 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
     },
   ];
 
-  const recentActivity = [
-    { action: "Audit submitted", project: "Marine Drive Resurfacing", time: "2 hours ago", status: "success" },
-    { action: "RTI filed", project: "Dadar Skywalk Repair", time: "1 day ago", status: "pending" },
-    { action: "Alert raised", project: "Linking Road Patch", time: "3 days ago", status: "warning" },
-    { action: "Report verified", project: "Andheri Flyover", time: "1 week ago", status: "success" },
-  ];
+  const mappedOfficialRecords = useMemo(() => {
+    return projects.map((p: any) => ({
+      id: p.id,
+      projectName: p.project_name,
+      budget: p.budget || 0,
+      location: { lat: p.latitude || 0, lng: p.longitude || 0 },
+      contractor: p.vendor_id ? `Vendor #${p.vendor_id}` : 'Various',
+      status: p.status,
+      category: p.category,
+      deadline: p.deadline || '',
+      description: p.description || ''
+    }));
+  }, [projects]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden w-full font-sans relative">
@@ -518,7 +560,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                   </div>
                   <div className="flex-1">
                     <MapVisualizer
-                      records={records}
+                      records={mappedOfficialRecords}
                       reports={mapReports}
                       onRecordSelect={setSelectedRecord}
                       userLocation={userLocation}
@@ -543,51 +585,51 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                       className="text-[10px] px-2 py-0.5 rounded-full font-medium"
                       style={{ backgroundColor: '#e0f7f9', color: '#57737a' }}
                     >
-                      {records.length} Active
+                      {nearbyProjects.length} Active
                     </span>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                    {records.map((record) => (
+                    {nearbyProjects.map((project: any) => (
                       <div
-                        key={record.id}
-                        onClick={() => setSelectedRecord(record)}
+                        key={project.id}
+                        onClick={() => setSelectedRecord(mappedOfficialRecords.find(r => r.id === project.id) || null)}
                         className="p-4 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md group"
                         style={{
-                          backgroundColor: selectedRecord?.id === record.id ? '#040f0f' : '#f4feff',
-                          border: selectedRecord?.id === record.id ? 'none' : '1px solid #e0f7f9',
+                          backgroundColor: selectedRecord?.id === project.id ? '#040f0f' : '#f4feff',
+                          border: selectedRecord?.id === project.id ? 'none' : '1px solid #e0f7f9',
                         }}
                       >
                         <div className="flex justify-between items-start mb-2">
                           <span
                             className="text-[10px] font-mono px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: selectedRecord?.id === record.id ? 'rgba(133,189,191,0.15)' : '#e0f7f9',
-                              color: selectedRecord?.id === record.id ? '#85bdbf' : '#57737a',
+                              backgroundColor: selectedRecord?.id === project.id ? 'rgba(133,189,191,0.15)' : '#e0f7f9',
+                              color: selectedRecord?.id === project.id ? '#85bdbf' : '#57737a',
                             }}
                           >
-                            {record.id}
+                            {project.id}
                           </span>
                           <span
                             className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                             style={{
-                              backgroundColor: record.status === "Completed" ? '#dcfce7' : '#e0f7f9',
-                              color: record.status === "Completed" ? '#16a34a' : '#57737a',
+                              backgroundColor: project.status === "Completed" ? '#dcfce7' : '#e0f7f9',
+                              color: project.status === "Completed" ? '#16a34a' : '#57737a',
                             }}
                           >
-                            {record.status}
+                            {project.status}
                           </span>
                         </div>
                         <h4
                           className="font-bold text-sm leading-tight mb-1"
-                          style={{ color: selectedRecord?.id === record.id ? '#e8f9fa' : '#040f0f' }}
+                          style={{ color: selectedRecord?.id === project.id ? '#e8f9fa' : '#040f0f' }}
                         >
-                          {record.projectName}
+                          {project.project_name}
                         </h4>
                         <div
                           className="text-[10px]"
-                          style={{ color: selectedRecord?.id === record.id ? '#85bdbf' : '#57737a' }}
+                          style={{ color: selectedRecord?.id === project.id ? '#85bdbf' : '#57737a' }}
                         >
-                          ₹{(record.budget / 10000000).toFixed(2)} Cr • {record.contractor}
+                          ₹{((project.budget || 0) / 10000000).toFixed(2)} Cr • {project.vendor_id ? `Vendor #${project.vendor_id}` : 'Various'}
                         </div>
                       </div>
                     ))}
@@ -597,45 +639,47 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
 
               {/* Activity Feed + Quick Actions Row */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Activity Feed */}
+                {/* Top Projects */}
                 <div
                   className="lg:col-span-2 rounded-2xl p-5"
                   style={{ backgroundColor: "#ffffff", border: "1px solid #b0d8db" }}
                 >
                   <div className="flex items-center justify-between mb-5">
-                    <h3 className="font-bold text-sm" style={{ color: '#040f0f' }}>Recent Activity</h3>
+                    <h3 className="font-bold text-sm" style={{ color: '#040f0f' }}>Top projects</h3>
                     <span className="text-[10px] font-bold flex items-center gap-1" style={{ color: '#85bdbf' }}>
                       <Clock size={12} /> Updated live
                     </span>
                   </div>
                   <div className="space-y-3">
-                    {recentActivity.map((item, i) => (
+                    {topProjects.length > 0 ? topProjects.map((item: any) => (
                       <div
-                        key={i}
+                        key={item.id}
                         className="flex items-center gap-4 p-3 rounded-xl transition-colors"
                         style={{ backgroundColor: '#f4feff' }}
                       >
                         <div
                           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                           style={{
-                            backgroundColor: item.status === 'success' ? '#dcfce7'
-                              : item.status === 'warning' ? '#fef3c7'
+                            backgroundColor: item.status === 'Completed' ? '#dcfce7'
+                              : item.status === 'In Progress' ? '#fef3c7'
                                 : '#e0f7f9',
                           }}
                         >
-                          {item.status === 'success' ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
-                            : item.status === 'warning' ? <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
-                              : <Clock size={18} style={{ color: '#57737a' }} />}
+                          {item.status === 'Completed' ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                            : item.status === 'In Progress' ? <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
+                              : <Building2 size={18} style={{ color: '#57737a' }} />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate" style={{ color: '#040f0f' }}>{item.action}</p>
-                          <p className="text-xs truncate" style={{ color: '#57737a' }}>{item.project}</p>
+                          <p className="text-sm font-semibold truncate" style={{ color: '#040f0f' }}>{item.project_name}</p>
+                          <p className="text-xs truncate capitalize" style={{ color: '#57737a' }}>{item.category || 'General'}</p>
                         </div>
-                        <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: '#85bdbf' }}>
-                          {item.time}
+                        <span className="text-xs font-bold whitespace-nowrap" style={{ color: '#85bdbf' }}>
+                           ₹{((item.budget || 0) / 10000000).toFixed(2)} Cr
                         </span>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="text-sm font-semibold text-center text-slate-500 py-4">No projects available.</div>
+                    )}
                   </div>
                 </div>
 
@@ -698,7 +742,7 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                     <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#e0f7f9' }}>
                       <div className="h-full rounded-full" style={{ width: '72%', backgroundColor: '#85bdbf' }}></div>
                     </div>
-                    <p className="text-[10px] mt-2" style={{ color: '#57737a' }}>Based on {records.length} active projects in your area</p>
+                    <p className="text-[10px] mt-2" style={{ color: '#57737a' }}>Based on {projects.length} connected metrics in your area</p>
                   </div>
                 </div>
               </div>

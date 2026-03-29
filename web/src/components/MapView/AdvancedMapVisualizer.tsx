@@ -73,6 +73,29 @@ const getColorForCategory = (category?: string) => {
   return CATEGORY_COLORS[category || 'Other'] || CATEGORY_COLORS['Other'];
 };
 
+const getCategoryEmoji = (category?: string) => {
+  switch (category) {
+    case 'Roads': return '🛣️';
+    case 'Sanitation': return '🚯';
+    case 'Public Buildings': return '🏢';
+    case 'Water Supply': return '🚰';
+    case 'Electricity & Streetlights': return '💡';
+    case 'Building & Construction': return '🏗️';
+    default: return '📍';
+  }
+};
+
+const createEmojiIcon = (category?: string) => {
+  if (typeof window === "undefined") return L.divIcon({});
+  const emoji = getCategoryEmoji(category);
+  const iconHtml = renderToStaticMarkup(
+    <div className="relative flex items-center justify-center w-8 h-8 pointer-events-none" style={{ fontSize: '24px', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' }}>
+      {emoji}
+    </div>
+  );
+  return L.divIcon({ html: iconHtml, className: "custom-emoji-marker !bg-transparent !border-0", iconSize: [32, 32], iconAnchor: [16, 16] });
+};
+
 // User Location Icon
 const createUserIcon = () => {
   if (typeof window === "undefined") return L.divIcon({});
@@ -279,6 +302,7 @@ export default function AdvancedMapVisualizer({
           <Marker
             key={record.id}
             position={[record.location.lat, record.location.lng]}
+            icon={createEmojiIcon((record as any).category)}
             eventHandlers={{ click: () => onRecordSelect(record) }}
           >
             <Popup>
