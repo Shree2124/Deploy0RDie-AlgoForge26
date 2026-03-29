@@ -1,171 +1,92 @@
-# 🛡️ Project INTEGRITY  
-**AI-Powered Infrastructure Transparency Platform**
+# Civic.ai (Project Civic.ai)
+Expose gaps. Empower citizens.
 
-> Bridging the gap between government records and on-ground reality using Agentic AI and Geospatial Intelligence.
+## Overview
+Citizens often face inconsistencies in public infrastructure, such as roads failing soon after repairs or facilities existing only in official records. Although public spending data is available, it is often buried in complex documents, making verification difficult.
 
----
+ (Civic.ai) is an AI-Powered Infrastructure Transparency Platform designed to eliminate the gap between government infrastructure records and on-ground reality. It acts as a digital anti-corruption layer for municipalities by combining Agentic AI, custom computer vision, geospatial data, and public documents into a single transparent system.
 
-## 🚨 Problem  
+## Table of Contents
+- [The Problem](#the-problem)
+- [The Solution](#the-solution)
+- [Core Features](#core-features)
+- [System Architecture](#system-architecture)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Team](#team)
 
-Across cities, citizens face a common frustration:  
-- Roads break weeks after being “repaired”  
-- Infrastructure exists on paper but not in reality  
-- Public money is spent, but verification is impossible  
+## The Problem
+There is a significant lack of transparency and accountability in public infrastructure projects. Key challenges include:
+- Government spending data is not easily understandable for common citizens.
+- No reliable way to verify whether funds were used properly.
+- Infrastructure issues (e.g., potholes, broken facilities) are underreported or ignored.
+- Authorities often operate without real-time public feedback or audit visibility.
 
-While public spending data exists, it is locked inside complex documents that ordinary citizens cannot easily understand or verify.
+## The Solution
+We propose a progressive web application (PWA) that enables citizens to verify public infrastructure, audit government spending, and visualize real-world conditions through AI-driven insights and geospatial mapping.
 
-**Project INTEGRITY** solves this by creating a **transparent, AI-powered verification layer** between **official public records** and **citizen-reported reality**.
+## Core Features
 
----
+### 1. Secure Citizen Reporting
+- Highly secure identity verification using Aadhar and Phone mapping to prevent spam and fake reports.
+- Capture infrastructure images with automatic GPS location and timestamp locking.
 
-## 🧠 What We Built  
+### 2. Agentic Audit Workflow
+An autonomous, non-blocking multi-agent AI pipeline:
+- **Vision Model (Custom):** Detects specific damages (e.g., potholes, structural cracks) and generates bounding boxes with confidence scores.
+- **Retrieval:** Fetches official project data (budget, contractor, status) from the database.
+- **Reasoning Engine (Gemini):** Analyzes the visual detections against the official records to verify claims, generate a Risk Level (High/Medium/Low), and provide actionable discrepancies.
 
-INTEGRITY is a **web-based civic intelligence platform** that allows:
+### 3. Geospatial Transparency Map
+- An interactive dashboard mapping all verified reports and government projects.
+- Color-coded risk visualization (Green: Compliant, Yellow: Minor Mismatch, Red: High Risk).
 
-- Citizens to upload real-world infrastructure evidence  
-- AI to analyze government spending documents  
-- Autonomous agents to audit discrepancies  
-- A live map to visualize corruption and compliance  
+### 4. Automated RTI & Complaint Generation
+- Citizens can select their AI-verified infrastructure reports and instantly generate formal Right to Information (RTI) requests or complaint drafts.
+- Directly routes issues to specific departments (MCGM, PWD, etc.) with attached evidence.
 
-All in real time.
+### 5. Admin Control Center
+- Dedicated dashboard for municipal authorities.
+- View AI insights, manage KYC verifications, track contractor performance, and update project statuses in real-time.
 
----
+## System Architecture
 
-## 🧬 How It Works  
+1. **Information Capture:** Citizen uploads image via PWA.
+2. **Initial Storage:** Data stored in Supabase (PostgreSQL & Storage). Return 200 OK to the client.
+3. **Non-Blocking AI Audit:** - Background request triggers the custom object detection model.
+   - Outputs feed into the LLM (Gemini) along with official project data.
+4. **Data Aggregation:** Final risk scores and verdicts update the database.
+5. **Visualization & Action:** Data reflects on the live Leaflet map and enables the RTI generation module.
 
-### 1️⃣ Evidence Collection  
-Users upload:
-- Infrastructure photos  
-- Automatic GPS location  
-- Timestamped proof  
+## Tech Stack
 
-This creates verifiable on-ground evidence.
+**Frontend**
+- Next.js (TypeScript, App Router)
+- Tailwind CSS (Styling)
+- Framer Motion (Animations)
+- Leaflet.js / React-Leaflet (Geospatial Mapping)
+- Lucide React (Icons)
 
----
+**Backend & Database**
+- Next.js API Routes (Serverless)
+- Supabase (PostgreSQL Database)
+- Supabase Auth & Storage Buckets
 
-### 2️⃣ Government Data Extraction  
-Government project PDFs are processed using AI to extract:
-- Project name  
-- Budget  
-- Contractor  
-- Completion status  
+**Artificial Intelligence**
+- Google Gemini API (Reasoning, Summary, Document Generation)
+- Custom Object Detection Model (Python/Flask)
 
-This creates a structured **official record**.
+## Getting Started
 
----
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or pnpm
+- Supabase Account
+- Google Gemini API Key
 
-### 3️⃣ Agentic Audit System  
+### Installation
 
-Three autonomous AI agents collaborate:
-
-| Agent | Role |
-|------|------|
-| **Retriever Agent** | Fetches official government project data |
-| **Audit Agent** | Compares user evidence with official records |
-| **Verdict Agent** | Calculates risk score and generates reasoning |
-
-This ensures **transparent, explainable AI auditing** instead of black-box decisions.
-
----
-
-### 4️⃣ Geospatial Corruption Map  
-
-Every report is plotted on a live map:
-
-- 🟢 Green = Verified & compliant  
-- 🔴 Red = High discrepancy / possible misuse  
-
-Users can filter by:
-- Roads  
-- Sanitation  
-- Public Works  
-
-This allows citizens and authorities to instantly identify risk zones.
-
----
-
-## 🔥 Key Features  
-
-- 📄 AI-powered government document analysis  
-- 📸 GPS & timestamped citizen reporting  
-- 🤖 Multi-agent AI audit pipeline  
-- 🗺 Interactive corruption heatmap  
-- 🔐 Anonymous & privacy-first reporting  
-- 🧾 AI-generated audit verdicts  
-
----
-
-## 🧰 Tech Stack  
-
-**Frontend**  
-- Next.js (React)  
-- Tailwind CSS  
-- ShadCN UI  
-- Leaflet.js  
-- Recharts  
-
-**Backend & Cloud**  
-- Firebase Hosting  
-- Firebase Auth (Anonymous)  
-- Firestore (Mock Government DB)  
-- Firebase Storage  
-
-**AI & Agents**  
-- Gemini / OpenAI APIs  
-- Vision models for image analysis  
-- LLM-based reasoning agents  
-
-**Geo & Maps**  
-- OpenStreetMap  
-- Browser GPS API  
-- Leaflet Heatmaps  
-
----
-
-## 🧪 Example Flow  
-
-1. Government record says:  
-   *“Road repaired for ₹5,00,000”*  
-
-2. Citizen uploads a photo showing potholes  
-
-3. AI Agents detect mismatch  
-
-4. System generates:  
-   **Risk Level: HIGH – Possible fund misuse**  
-
-5. Location turns red on the map  
-
----
-
-## 🏛 Why It Matters  
-
-Project INTEGRITY transforms citizens into **digital auditors**.  
-It doesn’t accuse — it **verifies**.
-
-By combining AI, maps, and public data, it creates:
-- Accountability  
-- Transparency  
-- Trust  
-
-This is how technology can strengthen democracy.
-
----
-
-## 🚀 Future Scope  
-
-- RTI & complaint auto-generation  
-- Predictive corruption analytics  
-- Mobile app & offline reporting  
-- Integration with government open data  
-
----
-
-## 🧑‍💻 Built For  
-
-**HackSync – GDG Thadomal Shahani Engineering College**  
-24-Hour Hackathon  
-
----
-
-> *“Sunlight is the best disinfectant — INTEGRITY makes it digital.”*
+1. Clone the repository:
+   ```bash
+   git clone [https://github.com/your-org/civic-ai.git](https://github.com/your-org/civic-ai.git)
+   cd civic-ai

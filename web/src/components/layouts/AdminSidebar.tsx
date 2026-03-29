@@ -34,8 +34,8 @@ interface AdminSidebarProps {
   pendingRtiCount?: number;
 }
 
-export default function AdminSidebar({ 
-  activeTab, 
+export default function AdminSidebar({
+  activeTab,
   onTabChange,
   highRiskCount = 0,
   pendingRtiCount = 0
@@ -51,7 +51,7 @@ export default function AdminSidebar({
     { id: "vendors", label: "Vendors", icon: Store },
     { id: "verifications", label: "Citizen KYC", icon: ShieldCheck },
     { id: "rti", label: "RTI Requests", icon: FileText, count: pendingRtiCount },
-    { id: "contractors", label: "Contractors", icon: Users },
+    // { id: "contractors", label: "Contractors", icon: Users },
     { id: "system", label: "System Admin", icon: Settings },
   ];
 
@@ -79,7 +79,7 @@ export default function AdminSidebar({
               className="flex items-center gap-3 group shrink-0"
             >
               <div className="bg-[#c2fcf7] p-1.5 rounded-lg flex-shrink-0">
-                <Building2 size={24} className="text-[#040f0f]" />
+                <img src="/mainlogo.svg" alt="Civic.ai Logo" className="w-6 h-6 object-contain" />
               </div>
               <div className="flex flex-col overflow-hidden">
                 <Link href="/">
@@ -127,9 +127,8 @@ export default function AdminSidebar({
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`w-full flex items-center gap-3 rounded-xl text-[14px] font-medium transition-all duration-200 group relative ${
-                collapsed ? "px-0 py-3 justify-center" : "px-4 py-3 justify-between"
-              }`}
+              className={`w-full flex items-center gap-3 rounded-xl text-[14px] font-medium transition-all duration-200 group relative ${collapsed ? "px-0 py-3 justify-center" : "px-4 py-3 justify-between"
+                }`}
               style={{
                 backgroundColor: isActive
                   ? "rgba(255, 255, 255, 0.18)"
@@ -146,7 +145,7 @@ export default function AdminSidebar({
                   transition={{ duration: 0.2 }}
                 />
               )}
-              
+
               <div className="flex items-center gap-3 overflow-hidden">
                 <item.icon size={20} className="shrink-0" />
                 <AnimatePresence>
@@ -165,9 +164,9 @@ export default function AdminSidebar({
 
               {/* Notification Badges */}
               {!collapsed && item.count !== undefined && item.count > 0 && (
-                <span 
+                <span
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                  style={{ 
+                  style={{
                     backgroundColor: isActive ? "#c2fcf7" : "rgba(239, 68, 68, 0.15)", // red-500 tint
                     color: isActive ? "#040f0f" : "#fca5a5", // text-red-300
                     border: isActive ? "none" : "1px solid rgba(239, 68, 68, 0.3)"
@@ -204,9 +203,8 @@ export default function AdminSidebar({
         )}
         <button
           onClick={() => signOut()}
-          className={`w-full flex items-center gap-3 rounded-xl text-[14px] font-medium transition-all duration-200 hover:bg-red-500/10 ${
-            collapsed ? "px-0 py-3 justify-center" : "px-4 py-3"
-          }`}
+          className={`w-full flex items-center gap-3 rounded-xl text-[14px] font-medium transition-all duration-200 hover:bg-red-500/10 ${collapsed ? "px-0 py-3 justify-center" : "px-4 py-3"
+            }`}
           style={{ color: "#fca5a5" }}
           title={collapsed ? "Sign Out" : undefined}
         >
