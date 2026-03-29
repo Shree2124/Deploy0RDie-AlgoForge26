@@ -14,7 +14,9 @@ import {
   ChevronRight,
   ShieldAlert,
   Building2,
-  ShieldCheck
+  ShieldCheck,
+  FolderKanban,
+  Store
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -45,6 +47,8 @@ export default function AdminSidebar({
   const sidebarItems: SidebarItem[] = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "issues", label: "Issues & Risk", icon: AlertTriangle, count: highRiskCount },
+    { id: "projects", label: "Projects", icon: FolderKanban },
+    { id: "vendors", label: "Vendors", icon: Store },
     { id: "verifications", label: "Citizen KYC", icon: ShieldCheck },
     { id: "rti", label: "RTI Requests", icon: FileText, count: pendingRtiCount },
     { id: "contractors", label: "Contractors", icon: Users },
