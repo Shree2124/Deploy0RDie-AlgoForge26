@@ -76,19 +76,14 @@ export default function AdminSidebar({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-3 group shrink-0"
+              className="flex items-center gap-3"
             >
-              <div className="bg-[#c2fcf7] p-1.5 rounded-lg flex-shrink-0">
-                <img src="/mainlogo.svg" alt="Civic.ai Logo" className="w-6 h-6 object-contain" />
-              </div>
-              <div className="flex flex-col overflow-hidden">
-                <Link href="/">
-                  <h1 className="text-lg font-bold font-serif tracking-wide text-white truncate">Civic.ai</h1>
-                </Link>
-                <p className="text-[10px] uppercase tracking-widest truncate" style={{ color: "rgba(255, 255, 255, 0.6)" }}>
-                  Admin Console
-                </p>
-              </div>
+              <img
+                src="/mainlogo.svg"
+                alt="Civic.ai"
+                className="h-10 w-auto object-contain"
+                style={{ filter: "brightness(0) invert(1)" }}
+              />
             </motion.div>
           )}
         </AnimatePresence>
