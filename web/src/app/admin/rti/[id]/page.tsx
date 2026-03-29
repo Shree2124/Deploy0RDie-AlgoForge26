@@ -213,6 +213,40 @@ export default function AdminRtiReviewPage() {
                       </div>
                     </div>
 
+                    {/* Resolution Summary for Processed Requests */}
+                    {rtiData.status !== 'Pending Review' && rtiData.rti_response && rtiData.rti_response.length > 0 && (
+                      <div className={`p-6 rounded-2xl border ${rtiData.status === 'Approved' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="flex items-center gap-2 mb-3">
+                          {rtiData.status === 'Approved' ? <CheckCircle2 className="text-green-600" size={20} /> : <XCircle className="text-red-600" size={20} />}
+                          <h3 className="font-bold text-lg" style={{ color: '#040f0f' }}>Official Resolution Summary</h3>
+                        </div>
+
+                        {rtiData.status === 'Approved' ? (
+                          <div className="space-y-4">
+                            <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: '#57737a' }}>
+                              {rtiData.rti_response[0].response_text}
+                            </div>
+                            {rtiData.rti_response[0].attachments && rtiData.rti_response[0].attachments.length > 0 && (
+                              <div className="pt-3 border-t border-green-200">
+                                <a
+                                  href={rtiData.rti_response[0].attachments[0]}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm font-bold text-green-700 flex items-center gap-2 hover:underline"
+                                >
+                                  <Paperclip size={16} /> View Resolution Attachment
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm italic" style={{ color: '#854d4d' }}>
+                            <strong>Rejection Reason:</strong> {rtiData.rti_response[0].rejection_reason}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Action Panel */}
                     <div className="pt-6 mt-6 flex flex-col sm:flex-row gap-3 justify-end" style={{ borderTop: '1px solid #e0f7f9' }}>
                       <button
