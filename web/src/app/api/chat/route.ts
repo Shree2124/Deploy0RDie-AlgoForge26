@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
-
 export async function POST(req: Request) {
     try {
+        const groq = new Groq({
+            apiKey: process.env.GROQ_API_KEY,
+        });
         const { messages } = await req.json();
 
         if (!messages || !Array.isArray(messages)) {
@@ -15,7 +14,7 @@ export async function POST(req: Request) {
 
         const completion = await groq.chat.completions.create({
             messages: messages,
-            model: 'llama3-70b-8192',
+            model: 'llama-3.3-70b-versatile',
             temperature: 0.7,
             max_tokens: 512,
         });
@@ -25,6 +24,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ text: responseText });
     } catch (error: any) {
         console.error('Groq API Error:', error);
-        return NextResponse.json({ error: 'Failed to communicate with AI' }, { status: 500 });
+        return NextResponse.json({
+            error: 'Failed to communicate with AI',
+            details: error.message || String(error)
+        }, { status: 500 });
     }
 }

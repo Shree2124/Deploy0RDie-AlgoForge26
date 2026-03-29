@@ -8,6 +8,8 @@ import { EmailVerificationBanner } from "@/components/auth/EmailVerificationBann
 import SiteHeader from "@/components/layouts/SiteHeader";
 import DashboardSidebar from "@/components/layouts/DashboardSidebar";
 import DashboardPage from "@/app/(site)/dashboard/page";
+import { ChatBot } from "@/components/LandingPage/ChatBot";
+import { AccessibilityWidget } from "@/components/ui/AccessibilityWidget";
 
 export default function SiteLayout({
   children,
@@ -75,6 +77,8 @@ export default function SiteLayout({
           </main>
         </div>
       </div>
+      <ChatBot />
+      <AccessibilityWidget />
     </>
   );
 }
