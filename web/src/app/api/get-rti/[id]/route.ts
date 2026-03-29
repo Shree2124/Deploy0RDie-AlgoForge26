@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   try {
     const { data, error } = await supabaseAdmin
       .from('rti_requests')
-      .select('*')
+      .select('*, rti_response(*)')
       .eq('id', id)
       .single();
 

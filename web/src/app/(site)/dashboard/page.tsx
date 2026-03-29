@@ -899,10 +899,10 @@ export default function DashboardPage({ activeTab: propActiveTab, onTabChange, i
                           ID: {doc.id} • {new Date(doc.created_at).toLocaleDateString()}
                         </p>
 
-                        {/* Fallback for old extract_data URL and New response attachments */}
-                        {(doc.extract_data?.document_url || (response?.attachments && response.attachments.length > 0)) && (
+                        {/* Prioritize Admin uploaded response attachments, then fallback to original extracted documents */}
+                        {((response?.attachments && response.attachments.length > 0) || doc.extract_data?.document_url) && (
                           <a
-                            href={doc.extract_data?.document_url || response.attachments[0]}
+                            href={(response?.attachments && response.attachments.length > 0) ? response.attachments[0] : doc.extract_data?.document_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full py-2 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 hover:bg-[#f4feff]"
